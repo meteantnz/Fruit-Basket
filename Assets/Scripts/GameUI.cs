@@ -6,9 +6,9 @@ using UnityEngine.UI;
 
 public class GameUI : MonoBehaviour
 {
-    public string scoreText;
+    string scoreText;
     public int scoreValue;
-    public TextMeshProUGUI score;
+    public TextMeshProUGUI _score;
     public Slider scoreSlider;
 
     private void Start()
@@ -18,7 +18,7 @@ public class GameUI : MonoBehaviour
     private void Update()
     {
         scoreText = scoreValue.ToString();
-        score.text = scoreText;
+        _score.text = scoreText;
         scoreSlider.value = scoreValue;
     }
 

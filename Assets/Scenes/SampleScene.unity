@@ -788,12 +788,57 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4610ed3d28acb5041978d2613ea23374, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  fruitPrefab: {fileID: 1664695960559795506, guid: cf50a3fc32053034b89a727acddc65b3, type: 3}
+  fruitList:
+  - prefab: {fileID: 3092598259661473481, guid: 94ca3e5e7deaa114ba2ecddf14c5a0b8, type: 3}
+    spawnProbability: 10
+    score: 5
+  - prefab: {fileID: 2954264802345381325, guid: 64e88f226f445a1468e28600ca351030, type: 3}
+    spawnProbability: 10
+    score: 1
+  - prefab: {fileID: 5327327457737737725, guid: 54cd8ea5de6eeac4f96dfec1f9bf910e, type: 3}
+    spawnProbability: 10
+    score: 8
+  - prefab: {fileID: 4539306621334564781, guid: 84ddcef0c0406c14dbdf753960afeeab, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 648178238650727980, guid: 6d284468717339e4f8d9b1e697d31502, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 7333681427702691700, guid: d50b233e80f4e3a479f0619b2feba0bf, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 1615881061740772345, guid: fb091979ab18d3f4e8b265234f95c6f5, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 1131528971047669811, guid: 695e950d82b750c40873c6ac46675150, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 625887964052768951, guid: 54b19ae04fdd49940a875ae808c8bcb1, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 8546380166945225592, guid: a06cfbac939f96e46b285271039af26d, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 8663037574043252145, guid: 4d39cb84507815142af1eb291361b10f, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 8701070836640151315, guid: ad0d1edf5a7280c459e6aeb40608e844, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 8801233089474321587, guid: 87992ff1411891f43bd5c4f2c97a3e5a, type: 3}
+    spawnProbability: 10
+    score: 0
+  - prefab: {fileID: 1736412078436589887, guid: eb35f3921c72c874ca5a8dfdc8e54aad, type: 3}
+    spawnProbability: 10
+    score: 2
+  - prefab: {fileID: 2394878886261853786, guid: b075a69e25775894598cd43d05745cd0, type: 3}
+    spawnProbability: 10
+    score: 0
   minX: -2.39
   maxX: 2.39
-  ySpawnHeight: 5.79
-  meyveAdeti: 20
-  spawnInterval: 0.3
+  ySpawnHeight: 8
+  meyveAdeti: 100
+  spawnInterval: 1
 --- !u!4 &663866059
 Transform:
   m_ObjectHideFlags: 0
@@ -1301,9 +1346,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d36580e6789b8b44492458a8eadd737d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scoreText: 
   scoreValue: 0
-  score: {fileID: 694741776}
+  _score: {fileID: 694741776}
   scoreSlider: {fileID: 2134343460}
 --- !u!4 &1524386795
 Transform:
@@ -1467,8 +1511,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: -2.1651}
-  m_SizeDelta: {x: 0, y: 5.6701965}
+  m_AnchoredPosition: {x: 0, y: -1.8090973}
+  m_SizeDelta: {x: 0, y: 6.3439}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2046622050
 MonoBehaviour:
