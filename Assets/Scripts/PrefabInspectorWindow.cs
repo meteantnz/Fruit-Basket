@@ -5,9 +5,13 @@ using System.Collections.Generic;
 public class PrefabInspectorWindow : EditorWindow
 {
     private List<GameObject> selectedPrefabs = new List<GameObject>();
-    private List<Component> selectedComponents = new List<Component>(); // Seçili GameObject'lerin tüm bileþenleri
+    private Component[] selectedComponents;
     private float sharedValue = 0.0f;
     private Vector2 scrollPosition = Vector2.zero;
+    private int selectedColliderTypeIndex = 0;
+    private bool isAddingCollider = true;
+
+    private string[] colliderTypes = { "None", "Box Collider", "Sphere Collider", "Capsule Collider", "Mesh Collider", "Box Collider 2D", "Circle Collider 2D", "Edge Collider 2D", "Polygon Collider 2D" };
 
     [MenuItem("Window/Prefab Inspector")]
     public static void ShowWindow()
@@ -21,7 +25,6 @@ public class PrefabInspectorWindow : EditorWindow
 
         GUILayout.Label("Prefab'larý Seçin ve Pencereye Býrakýn", EditorStyles.boldLabel);
 
-        // Sürükle ve býrak kontrolü
         if (e.type == EventType.DragUpdated || e.type == EventType.DragPerform)
         {
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
@@ -39,9 +42,6 @@ public class PrefabInspectorWindow : EditorWindow
                         if (!selectedPrefabs.Contains(draggedPrefab))
                         {
                             selectedPrefabs.Add(draggedPrefab);
-                            // Seçilen prefablarýn tüm bileþenlerini al
-                            Component[] components = draggedPrefab.GetComponents<Component>();
-                            selectedComponents.AddRange(components);
                         }
                     }
                 }
@@ -50,11 +50,10 @@ public class PrefabInspectorWindow : EditorWindow
             }
         }
 
-        GUILayout.Space(20); // Prefab'lar ile ilk öðe arasýna bir boþluk ekleyin
+        GUILayout.Space(20);
 
         GUILayout.Label("Script Bileþeni Seçin", EditorStyles.boldLabel);
 
-        // Scroll view baþlatýlýyor
         scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
         foreach (GameObject selectedPrefab in selectedPrefabs)
@@ -62,50 +61,67 @@ public class PrefabInspectorWindow : EditorWindow
             if (selectedPrefab == null)
                 continue;
 
-            GUILayout.BeginVertical();
+            GUILayout.BeginHorizontal();
 
-            // Prefab'ýn ismini mavi kutu içinde göster
             EditorGUILayout.ObjectField(selectedPrefab, typeof(GameObject), true);
 
-            // Prefab isminin yanýnda "Kaldýr" butonu
             if (GUILayout.Button("Kaldýr", GUILayout.Width(80), GUILayout.Height(EditorGUIUtility.singleLineHeight)))
             {
                 RemoveSelectedPrefab(selectedPrefab);
-                // Ýterasyon sýrasýnda listeden bir öðe kaldýrýldýðýnda, indeksi güncelleyelim.
                 break;
             }
 
+            GUILayout.EndHorizontal();
+
             GUILayout.Space(10);
+
+            selectedComponents = selectedPrefab.GetComponents<Component>();
 
             foreach (Component component in selectedComponents)
             {
-                SerializedObject serializedObject = new SerializedObject(component);
-                SerializedProperty iterator = serializedObject.GetIterator();
-
-                while (iterator.NextVisible(true))
+                if (component is MonoBehaviour)
                 {
-                    EditorGUILayout.PropertyField(iterator, true);
+                    SerializedObject serializedObject = new SerializedObject(component);
+                    SerializedProperty iterator = serializedObject.GetIterator();
+
+                    while (iterator.NextVisible(true))
+                    {
+                        EditorGUILayout.PropertyField(iterator, true);
+                    }
+
+                    serializedObject.ApplyModifiedProperties();
+
+                    GUILayout.Space(10);
                 }
-
-                serializedObject.ApplyModifiedProperties();
-
-                GUILayout.Space(10);
             }
 
-            GUILayout.Space(20); // Her prefab arasýna bir boþluk ekleyin
-
-            GUILayout.EndVertical();
-
-            GUILayout.Space(10);
+            GUILayout.Space(20);
         }
 
-        // Scroll view sonlandýrýlýyor
         EditorGUILayout.EndScrollView();
 
         GUILayout.Space(10);
 
         GUILayout.Label("Paylaþýlan Deðer", EditorStyles.boldLabel);
         sharedValue = EditorGUILayout.FloatField(sharedValue);
+
+        GUILayout.Space(10);
+
+        GUILayout.Label("Collider Ayarlarý", EditorStyles.boldLabel);
+
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label("Collider Türünü Seçin", GUILayout.Width(150));
+        selectedColliderTypeIndex = EditorGUILayout.Popup(selectedColliderTypeIndex, colliderTypes);
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button(isAddingCollider ? "Collider Ekle" : "Collider Kaldýr"))
+        {
+            AddRemoveColliderToSelectedPrefabs();
+        }
+
+        GUILayout.EndHorizontal();
 
         GUILayout.Space(10);
 
@@ -117,45 +133,110 @@ public class PrefabInspectorWindow : EditorWindow
         GUILayout.Space(10);
     }
 
-    private void ApplyChangesToSelectedPrefabs()
+    private void AddRemoveColliderToSelectedPrefabs()
     {
-        foreach (Component component in selectedComponents)
-        {
-            SerializedObject serializedObject = new SerializedObject(component);
-            SerializedProperty iterator = serializedObject.GetIterator();
-
-            while (iterator.NextVisible(true))
-            {
-                if (iterator.propertyType != SerializedPropertyType.ObjectReference)
-                {
-                    iterator.floatValue = sharedValue;
-                }
-            }
-
-            serializedObject.ApplyModifiedProperties();
-        }
-
         foreach (GameObject selectedPrefab in selectedPrefabs)
         {
             if (selectedPrefab == null)
                 continue;
 
-            EditorUtility.SetDirty(selectedPrefab);
-            PrefabUtility.RecordPrefabInstancePropertyModifications(selectedPrefab);
+            string colliderType = colliderTypes[selectedColliderTypeIndex];
+
+            if (colliderType != "None")
+            {
+                if (isAddingCollider)
+                {
+                    AddCollider(selectedPrefab, colliderType);
+                }
+                else
+                {
+                    RemoveCollider(selectedPrefab, colliderType);
+                }
+            }
+        }
+    }
+
+    private void AddCollider(GameObject targetObject, string colliderType)
+    {
+        if (isAddingCollider)
+        {
+            switch (colliderType)
+            {
+                case "Box Collider":
+                    targetObject.AddComponent<BoxCollider>();
+                    break;
+                case "Sphere Collider":
+                    targetObject.AddComponent<SphereCollider>();
+                    break;
+                case "Capsule Collider":
+                    targetObject.AddComponent<CapsuleCollider>();
+                    break;
+                case "Mesh Collider":
+                    targetObject.AddComponent<MeshCollider>();
+                    break;
+                case "Box Collider 2D":
+                    targetObject.AddComponent<BoxCollider2D>();
+                    break;
+                case "Circle Collider 2D":
+                    targetObject.AddComponent<CircleCollider2D>();
+                    break;
+                case "Edge Collider 2D":
+                    targetObject.AddComponent<EdgeCollider2D>();
+                    break;
+                case "Polygon Collider 2D":
+                    targetObject.AddComponent<PolygonCollider2D>();
+                    break;
+            }
+        }
+    }
+
+    private void RemoveCollider(GameObject targetObject, string colliderType)
+    {
+        Component colliderComponent = isAddingCollider ? (Component)targetObject.GetComponent<Collider>() : (Component)targetObject.GetComponent<Collider2D>();
+
+        if (colliderComponent != null && colliderComponent.GetType().Name == colliderType.Replace(" 2D", ""))
+        {
+            DestroyImmediate(colliderComponent);
+        }
+    }
+
+    private void ApplyChangesToSelectedPrefabs()
+    {
+        foreach (GameObject selectedPrefab in selectedPrefabs)
+        {
+            if (selectedPrefab == null)
+                continue;
+
+            Component[] components = selectedPrefab.GetComponents<Component>();
+
+            foreach (Component component in components)
+            {
+                if (component is MonoBehaviour)
+                {
+                    SerializedObject serializedObject = new SerializedObject(component);
+                    SerializedProperty iterator = serializedObject.GetIterator();
+
+                    while (iterator.NextVisible(true))
+                    {
+                        if (iterator.propertyType != SerializedPropertyType.ObjectReference)
+                        {
+                            iterator.floatValue = sharedValue;
+                        }
+                    }
+
+                    serializedObject.ApplyModifiedProperties();
+
+                    EditorUtility.SetDirty(selectedPrefab);
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(selectedPrefab);
+                }
+            }
         }
     }
 
     private void RemoveSelectedPrefab(GameObject prefabToRemove)
     {
         selectedPrefabs.Remove(prefabToRemove);
-        // Seçilen prefablarýn tüm bileþenlerini listeden çýkar
-        Component[] components = prefabToRemove.GetComponents<Component>();
-        foreach (Component component in components)
-        {
-            selectedComponents.Remove(component);
-        }
 
-        // Prefab Asset'i içindeki GameObject'u silmek için
         GameObject prefabRoot = PrefabUtility.GetOutermostPrefabInstanceRoot(prefabToRemove);
         DestroyImmediate(prefabRoot, true);
     }

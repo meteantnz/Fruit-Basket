@@ -791,10 +791,10 @@ MonoBehaviour:
   fruitList:
   - prefab: {fileID: 3092598259661473481, guid: 94ca3e5e7deaa114ba2ecddf14c5a0b8, type: 3}
     spawnProbability: 10
-    score: 5
+    score: 10
   - prefab: {fileID: 2954264802345381325, guid: 64e88f226f445a1468e28600ca351030, type: 3}
     spawnProbability: 10
-    score: 1
+    score: 45
   - prefab: {fileID: 5327327457737737725, guid: 54cd8ea5de6eeac4f96dfec1f9bf910e, type: 3}
     spawnProbability: 10
     score: 8

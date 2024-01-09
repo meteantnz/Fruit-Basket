@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3754596480193785486}
   - component: {fileID: 7463391108669817437}
-  - component: {fileID: -1842236275306881335}
+  - component: {fileID: -6629821888449504198}
   m_Layer: 0
   m_Name: Watermelon
   m_TagString: Untagged
@@ -85,7 +85,7 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!114 &-1842236275306881335
+--- !u!114 &-6629821888449504198
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -97,4 +97,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2e9f1d34cb678248b25fae69d489279, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementSpeed: 10
+  movementSpeed: 100

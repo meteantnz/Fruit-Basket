@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1257283495049925959}
   - component: {fileID: 1377230021526737143}
-  - component: {fileID: -7957437618632594657}
+  - component: {fileID: -7174794604421684693}
   m_Layer: 0
   m_Name: Pear
   m_TagString: Untagged
@@ -85,7 +85,7 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!114 &-7957437618632594657
+--- !u!114 &-7174794604421684693
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -97,4 +97,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2e9f1d34cb678248b25fae69d489279, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementSpeed: 10
+  movementSpeed: 100

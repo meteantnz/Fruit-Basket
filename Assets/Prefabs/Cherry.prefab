@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2569197193205116358}
   - component: {fileID: 7099792333418072248}
-  - component: {fileID: 4924176540157820875}
+  - component: {fileID: 3111235608656656459}
   m_Layer: 0
   m_Name: Cherry
   m_TagString: Untagged
@@ -85,7 +85,7 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!114 &4924176540157820875
+--- !u!114 &3111235608656656459
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -97,4 +97,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2e9f1d34cb678248b25fae69d489279, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementSpeed: 10
+  movementSpeed: 100
