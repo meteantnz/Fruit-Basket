@@ -191,6 +191,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &36322793
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 36322794}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &36322794
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 36322793}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.71475446, y: 5.908978, z: -0.038746424}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &61034778
 GameObject:
   m_ObjectHideFlags: 0
@@ -242,7 +273,7 @@ MonoBehaviour:
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 0, y: 0}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
@@ -836,9 +867,9 @@ MonoBehaviour:
     score: 0
   minX: -2.39
   maxX: 2.39
-  ySpawnHeight: 8
-  meyveAdeti: 100
-  spawnInterval: 1
+  ySpawnHeight: 0
+  meyveAdeti: 0
+  spawnInterval: 0
 --- !u!4 &663866059
 Transform:
   m_ObjectHideFlags: 0
@@ -1346,7 +1377,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d36580e6789b8b44492458a8eadd737d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scoreValue: 0
+  scoreValue: 100
   _score: {fileID: 694741776}
   scoreSlider: {fileID: 2134343460}
 --- !u!4 &1524386795
@@ -1731,3 +1762,4 @@ SceneRoots:
   - {fileID: 61034782}
   - {fileID: 25414643}
   - {fileID: 1524386795}
+  - {fileID: 36322794}
