@@ -862,13 +862,10 @@ MonoBehaviour:
   - prefab: {fileID: 1736412078436589887, guid: eb35f3921c72c874ca5a8dfdc8e54aad, type: 3}
     spawnProbability: 10
     score: 2
-  - prefab: {fileID: 2394878886261853786, guid: b075a69e25775894598cd43d05745cd0, type: 3}
-    spawnProbability: 10
-    score: 0
-  minX: -2.39
-  maxX: 2.39
-  ySpawnHeight: 0
-  meyveAdeti: 0
+  minX: -2.4
+  maxX: 2.59
+  ySpawnHeight: 7
+  meyveAdeti: 20
   spawnInterval: 0
 --- !u!4 &663866059
 Transform:

@@ -62,8 +62,6 @@ public class CustomEditorWindow : EditorWindow
 
             // Örnek Toggle düðmesi
             GUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Örnek Toggle Deðiþkeni");
-            myToggleVariable = EditorGUILayout.ToggleLeft("", myToggleVariable);
             GUILayout.EndHorizontal();
 
             if (showPropertyArray == null || showPropertyArray.Length != scriptComponents.Count)
@@ -112,8 +110,9 @@ public class CustomEditorWindow : EditorWindow
             {
                 GUILayout.BeginHorizontal();
 
+                // Toggle düðmesini etiketin sol tarafýna al
                 bool showProperty = GetPropertyVisibility(scriptComponent, fieldInfo.Name);
-                bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty);
+                bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty, GUILayout.Width(EditorGUIUtility.labelWidth - 15)); // Etiketin sol tarafýna 15 birim kadar boþluk býrakýldý
 
                 if (newVisibility != showProperty)
                 {
@@ -132,15 +131,15 @@ public class CustomEditorWindow : EditorWindow
                     // Alanýn türünü kontrol et ve uygun alan türünü kullan
                     if (fieldInfo.FieldType == typeof(int))
                     {
-                        fieldValue = EditorGUILayout.IntField(fieldInfo.Name, (int)fieldValue);
+                        fieldValue = EditorGUILayout.IntField("", (int)fieldValue);
                     }
                     else if (fieldInfo.FieldType == typeof(float))
                     {
-                        fieldValue = EditorGUILayout.FloatField(fieldInfo.Name, (float)fieldValue);
+                        fieldValue = EditorGUILayout.FloatField("", (float)fieldValue);
                     }
                     else if (fieldInfo.FieldType == typeof(string))
                     {
-                        fieldValue = EditorGUILayout.TextField(fieldInfo.Name, (string)fieldValue);
+                        fieldValue = EditorGUILayout.TextField("", (string)fieldValue);
                     }
                     // Diðer türleri ihtiyaca göre ekleyin...
 
@@ -152,6 +151,7 @@ public class CustomEditorWindow : EditorWindow
             }
         }
     }
+
 
     private bool GetPropertyVisibility(MonoBehaviour scriptComponent, string propertyName)
     {
