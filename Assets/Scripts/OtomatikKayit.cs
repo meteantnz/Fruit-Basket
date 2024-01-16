@@ -2,6 +2,8 @@ using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
+using System;
+using System.Linq;
 
 public class JsonManager
 {
@@ -9,6 +11,22 @@ public class JsonManager
 
     public static void SaveToJson(Dictionary<string, Dictionary<string, object>> data)
     {
+        string directoryPath = Path.GetDirectoryName(jsonFilePath);
+
+        // Dosya yolundaki klasörleri kontrol et ve yoksa oluþtur
+        if (!Directory.Exists(directoryPath))
+        {
+            try
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Dosya yolu oluþturulamadý: " + e.Message);
+                return;
+            }
+        }
+
         string json = JsonUtility.ToJson(data);
         File.WriteAllText(jsonFilePath, json);
 
@@ -33,13 +51,11 @@ public class JsonManager
     }
 }
 
-
 public class CustomEditorWindow : EditorWindow
 {
     private GameObject draggedGameObject;
     private List<MonoBehaviour> scriptComponents = new List<MonoBehaviour>();
-    private bool[] showPropertyArray;
-    private bool[] toggleValues;
+    private Dictionary<string, bool> toggleValues = new Dictionary<string, bool>(); // Her toggle için ayrý bir kimlik ve durum
     private Dictionary<string, Dictionary<string, object>> jsonValues;
 
     [MenuItem("Window/Özel Editör Penceresi")]
@@ -78,7 +94,7 @@ public class CustomEditorWindow : EditorWindow
                 {
                     DragAndDrop.AcceptDrag();
 
-                    foreach (Object draggedObj in DragAndDrop.objectReferences)
+                    foreach (UnityEngine.Object draggedObj in DragAndDrop.objectReferences)
                     {
                         draggedGameObject = draggedObj as GameObject;
                         ScriptleriTara();
@@ -101,101 +117,77 @@ public class CustomEditorWindow : EditorWindow
             {
                 draggedGameObject = null;
                 scriptComponents.Clear();
-                showPropertyArray = null;
-                toggleValues = null;
+                toggleValues.Clear();
                 jsonValues.Clear();
             }
 
             GUILayout.EndHorizontal();
 
-            if (toggleValues == null || toggleValues.Length != scriptComponents.Count)
-            {
-                toggleValues = new bool[scriptComponents.Count];
-                for (int j = 0; j < toggleValues.Length; j++)
-                {
-                    toggleValues[j] = false;
-                }
-            }
-
             for (int i = 0; i < scriptComponents.Count; i++)
             {
                 GUILayout.BeginHorizontal();
-
-                toggleValues[i] = EditorGUILayout.Toggle(toggleValues[i], GUILayout.Width(20));
 
                 GUILayout.Label(scriptComponents[i].GetType().Name);
 
                 GUILayout.EndHorizontal();
 
-                if (showPropertyArray == null || showPropertyArray.Length != scriptComponents.Count)
+                System.Reflection.FieldInfo[] fields = scriptComponents[i].GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                foreach (var fieldInfo in fields)
                 {
-                    showPropertyArray = new bool[scriptComponents.Count];
-                    for (int j = 0; j < showPropertyArray.Length; j++)
+                    GUILayout.BeginHorizontal();
+
+                    bool showProperty = GetPropertyVisibility(scriptComponents[i], fieldInfo.Name);
+                    bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty, GUILayout.Width(120));
+
+                    if (newVisibility != showProperty)
                     {
-                        showPropertyArray[j] = true;
+                        SetPropertyVisibility(scriptComponents[i], fieldInfo.Name, newVisibility);
                     }
-                }
 
-                if (showPropertyArray[i] || toggleValues[i])
-                {
-                    System.Reflection.FieldInfo[] fields = scriptComponents[i].GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    // Yeni kod, alan deðerini doðrudan görüntülemek ve düzenlemek için
+                    object value = fieldInfo.GetValue(scriptComponents[i]);
+                    Type fieldType = fieldInfo.FieldType;
 
-                    foreach (var fieldInfo in fields)
+                    // Alan etiketini görüntüle
+                    GUILayout.Label(":", GUILayout.Width(5));
+
+                    // Alan deðerini görüntüle ve düzenle
+                    if (fieldType == typeof(int))
                     {
-                        GUILayout.BeginHorizontal();
+                        int newValue = EditorGUILayout.IntField((int)value, GUILayout.Width(60));
+                        fieldInfo.SetValue(scriptComponents[i], newValue);
+                    }
+                    else if (fieldType == typeof(float))
+                    {
+                        float newValue = EditorGUILayout.FloatField((float)value, GUILayout.Width(60));
+                        fieldInfo.SetValue(scriptComponents[i], newValue);
+                    }
+                    else if (fieldType == typeof(string))
+                    {
+                        string newValue = EditorGUILayout.TextField((string)value, GUILayout.Width(80));
+                        fieldInfo.SetValue(scriptComponents[i], newValue);
+                    }
+                    // Diðer alan türleri için gerekirse daha fazla durum ekle
 
-                        bool showProperty = GetPropertyVisibility(scriptComponents[i], fieldInfo.Name);
-                        bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty, GUILayout.Width(EditorGUIUtility.labelWidth - 15));
+                    GUILayout.EndHorizontal();
 
-                        if (newVisibility != showProperty)
-                        {
-                            SetPropertyVisibility(scriptComponents[i], fieldInfo.Name, newVisibility);
-                        }
+                    if (newVisibility)
+                    {
+                        // Toggle'ýn kimliðini oluþtur
+                        string toggleKey = $"{scriptComponents[i].GetType().Name}_{fieldInfo.Name}";
 
-                        GUILayout.EndHorizontal();
+                        // Kimlikle birlikte JSON deðerini güncelle
+                        UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldInfo.GetValue(scriptComponents[i]), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
 
-                        if (showPropertyArray == null || showPropertyArray.Length != scriptComponents.Count)
-                        {
-                            showPropertyArray = new bool[scriptComponents.Count];
-                            for (int j = 0; j < showPropertyArray.Length; j++)
-                            {
-                                showPropertyArray[j] = true;
-                            }
-                        }
-
-                        if (showPropertyArray[i] || newVisibility)
-                        {
-                            object fieldValue = fieldInfo.GetValue(scriptComponents[i]);
-
-                            EditorGUI.BeginChangeCheck();
-
-                            if (fieldInfo.FieldType == typeof(int))
-                            {
-                                fieldValue = EditorGUILayout.IntField("", (int)fieldValue);
-                            }
-                            else if (fieldInfo.FieldType == typeof(float))
-                            {
-                                fieldValue = EditorGUILayout.FloatField("", (float)fieldValue);
-                            }
-                            else if (fieldInfo.FieldType == typeof(string))
-                            {
-                                fieldValue = EditorGUILayout.TextField("", (string)fieldValue);
-                            }
-
-                            if (EditorGUI.EndChangeCheck())
-                            {
-                                fieldInfo.SetValue(scriptComponents[i], fieldValue);
-                            }
-
-                            // JSON deðerini güncelle
-                            UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldValue, toggleValues[i]);
-
-                        }
+                        // Toggle durumunu güncelle
+                        toggleValues[toggleKey] = newVisibility;
                     }
                 }
             }
         }
     }
+
     private void ScriptleriTara()
     {
         if (draggedGameObject != null)
@@ -203,9 +195,13 @@ public class CustomEditorWindow : EditorWindow
             scriptComponents.Clear();
             MonoBehaviour[] scripts = draggedGameObject.GetComponents<MonoBehaviour>();
 
-            foreach (MonoBehaviour script in scripts)
+            foreach (var script in scripts)
             {
                 scriptComponents.Add(script);
+
+                // Toggle'ý varsayýlan olarak false olarak ayarla
+                string toggleKey = $"{script.GetType().Name}_";
+                toggleValues[toggleKey] = false;
             }
         }
     }
@@ -227,24 +223,19 @@ public class CustomEditorWindow : EditorWindow
         return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{propertyName}";
     }
 
-    private void UpdateJsonValue(string componentName, string propertyName, object value, bool shouldSave)
+    private void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
-        if (shouldSave && toggleValues != null && toggleValues.Length > 0)
+        if (toggleState)
         {
-            int componentIndex = scriptComponents.FindIndex(component => component.GetType().Name == componentName);
-
-            if (componentIndex >= 0 && componentIndex < toggleValues.Length && toggleValues[componentIndex])
+            if (!jsonValues.ContainsKey(componentName))
             {
-                if (!jsonValues.ContainsKey(componentName))
-                {
-                    jsonValues[componentName] = new Dictionary<string, object>();
-                }
-
-                jsonValues[componentName][propertyName] = value;
-
-                Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
+                jsonValues[componentName] = new Dictionary<string, object>();
             }
+
+            string key = $"{componentName}_{propertyName}";
+            jsonValues[componentName][key] = value;
+
+            Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
         }
     }
-
 }
