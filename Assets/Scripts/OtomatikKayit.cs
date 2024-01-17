@@ -7,7 +7,7 @@ using System.Linq;
 
 public class JsonManager
 {
-    private static string jsonFilePath = "Assets/Resources/savedData.json";
+    private static string jsonFilePath = "Assets/Resources/saveData/savedData.json";
 
     public static void SaveToJson(Dictionary<string, Dictionary<string, object>> data)
     {
@@ -35,9 +35,11 @@ public class JsonManager
 
     public static Dictionary<string, Dictionary<string, object>> LoadFromJson()
     {
-        if (File.Exists(jsonFilePath))
+        if (Resources.Load<TextAsset>("saveData/savedData") != null)
         {
-            string json = File.ReadAllText(jsonFilePath);
+            TextAsset textAsset = Resources.Load<TextAsset>("saveData/savedData");
+            string json = textAsset.text;
+
             var loadedData = JsonUtility.FromJson<Dictionary<string, Dictionary<string, object>>>(json);
 
             Debug.Log("JSON dosyasý þuradan yüklendi: " + jsonFilePath);
