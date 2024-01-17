@@ -3,79 +3,34 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using System;
+using System.Xml;
 using System.Linq;
 
-public class JsonManager
+public class CombinedManagerWindow : EditorWindow
 {
-    private static string jsonFilePath = "Assets/Resources/saveData/savedData.json";
-
-    public static void SaveToJson(Dictionary<string, Dictionary<string, object>> data)
-    {
-        string directoryPath = Path.GetDirectoryName(jsonFilePath);
-
-        // Dosya yolundaki klasörleri kontrol et ve yoksa oluþtur
-        if (!Directory.Exists(directoryPath))
-        {
-            try
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("Dosya yolu oluþturulamadý: " + e.Message);
-                return;
-            }
-        }
-
-        string json = JsonUtility.ToJson(data);
-        File.WriteAllText(jsonFilePath, json);
-
-        Debug.Log("JSON dosyasý þuraya kaydedildi: " + jsonFilePath);
-    }
-
-    public static Dictionary<string, Dictionary<string, object>> LoadFromJson()
-    {
-        if (Resources.Load<TextAsset>("saveData/savedData") != null)
-        {
-            TextAsset textAsset = Resources.Load<TextAsset>("saveData/savedData");
-            string json = textAsset.text;
-
-            var loadedData = JsonUtility.FromJson<Dictionary<string, Dictionary<string, object>>>(json);
-
-            Debug.Log("JSON dosyasý þuradan yüklendi: " + jsonFilePath);
-            return loadedData;
-        }
-        else
-        {
-            Debug.Log("Belirtilen yerde JSON dosyasý bulunamadý: " + jsonFilePath);
-            return new Dictionary<string, Dictionary<string, object>>();
-        }
-    }
-}
-
-public class CustomEditorWindow : EditorWindow
-{
+    private string jsonFilePath = "Assets/Resources/saveData/savedData.json";
+    private List<KeyValuePair<string, Dictionary<string, object>>> jsonValues = new List<KeyValuePair<string, Dictionary<string, object>>>();
     private GameObject draggedGameObject;
     private List<MonoBehaviour> scriptComponents = new List<MonoBehaviour>();
-    private Dictionary<string, bool> toggleValues = new Dictionary<string, bool>(); // Her toggle için ayrý bir kimlik ve durum
-    private Dictionary<string, Dictionary<string, object>> jsonValues;
+    private Dictionary<string, bool> toggleValues = new Dictionary<string, bool>();
 
     [MenuItem("Window/Özel Editör Penceresi")]
     public static void ShowWindow()
     {
-        GetWindow<CustomEditorWindow>("Özel Editör Penceresi");
+        GetWindow<CombinedManagerWindow>("Özel Editör Penceresi");
     }
 
     private void OnEnable()
     {
-        jsonValues = JsonManager.LoadFromJson();
-        Debug.Log("CustomEditorWindow etkinleþtirildi");
+        jsonValues = new List<KeyValuePair<string, Dictionary<string, object>>>();
+        LoadJsonValues();
+        Debug.Log("CombinedManagerWindow etkinleþtirildi");
     }
 
     private void OnDisable()
     {
-        JsonManager.SaveToJson(jsonValues);
-        Debug.Log("CustomEditorWindow devre dýþý býrakýldý");
+        SaveToJson();
+        Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
 
     private void OnGUI()
@@ -229,15 +184,148 @@ public class CustomEditorWindow : EditorWindow
     {
         if (toggleState)
         {
-            if (!jsonValues.ContainsKey(componentName))
+            // componentName'a ait önceki öðeyi bul
+            var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
+
+            if (existingEntry.Equals(default(KeyValuePair<string, Dictionary<string, object>>)))
             {
-                jsonValues[componentName] = new Dictionary<string, object>();
+                // componentName'a ait önceki öðe yoksa, yeni bir öðe oluþtur
+                var newEntry = new JsonEntry
+                {
+                    Key = componentName,
+                    Values = new Dictionary<string, object>()
+                };
+                newEntry.Values[$"{componentName}_{propertyName}"] = value;
+
+                // Yeni öðeyi jsonValues listesine ekle
+                jsonValues.Add(new KeyValuePair<string, Dictionary<string, object>>(componentName, newEntry.Values));
+            }
+            else
+            {
+                // componentName'a ait önceki öðe varsa, deðeri güncelle
+                existingEntry.Value[$"{componentName}_{propertyName}"] = value;
             }
 
-            string key = $"{componentName}_{propertyName}";
-            jsonValues[componentName][key] = value;
+            // Burada _jsonValues listesini jsonValues listesine eþitleyin
+            SerializableData serializableData = new SerializableData();
+            serializableData._jsonValues = jsonValues.SelectMany(entry => entry.Value.Select(kv => new JsonData
+            {
+                key = kv.Key,
+                value = kv.Value
+            })).ToList();
 
+            Debug.Log("Debug - serializableData.jsonValues içeriði: " + JsonUtility.ToJson(serializableData._jsonValues, true));
+            Debug.Log($"UpdateJsonValue - componentName: {componentName}, propertyName: {propertyName}, value: {value}, toggleState: {toggleState}");
             Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
         }
     }
+
+
+
+
+
+    // JSON verilerini serileþtirmek ve deserializasyon yapmak için kullanýlacak sýnýf
+    [System.Serializable]
+    public class JsonData
+    {
+        public string key;
+        public object value;
+    }
+
+    [System.Serializable]
+    public class JsonEntry
+    {
+        public string Key;
+        public Dictionary<string, object> Values;
+    }
+
+    [System.Serializable]
+    public class SerializableData
+    {
+        public List<JsonData> _jsonValues = new List<JsonData>();
+    }
+
+
+    private void SaveToJson()
+    {
+        // JsonData sýnýfýný kullanarak _jsonValues'e ekle
+        SerializableData serializableData = new SerializableData();
+        foreach (var entry in jsonValues)
+        {
+            foreach (var item in entry.Value)
+            {
+                JsonData jsonData = new JsonData();
+                jsonData.key = item.Key;
+                jsonData.value = item.Value;
+                serializableData._jsonValues.Add(jsonData);
+            }
+        }
+
+        // JSON verilerini dosyaya yazma
+        string json = JsonUtility.ToJson(serializableData, true);
+        File.WriteAllText(jsonFilePath, json);
+
+        Debug.Log($"JSON Ýçeriði (SaveToJson): {json}");
+    }
+
+    private void LoadJsonValues()
+    {
+        if (Resources.Load<TextAsset>("saveData/savedData") != null)
+        {
+            TextAsset textAsset = Resources.Load<TextAsset>("saveData/savedData");
+
+            string json = textAsset.text;
+
+            // JSON verilerini dosyadan okuma ve deserializasyon iþlemi
+            SerializableData loadedData = JsonUtility.FromJson<SerializableData>(json);
+
+            if (loadedData != null)
+            {
+                // jsonValues listesini temizle
+                jsonValues.Clear();
+
+                foreach (var jsonData in loadedData._jsonValues)
+                {
+                    // jsonValues listesine elemanlarý ekleyin
+                    var keyParts = jsonData.key.Split('_');
+                    if (keyParts.Length == 2)
+                    {
+                        var componentName = keyParts[0];
+                        var propertyName = keyParts[1];
+
+                        // componentName'a ait önceki öðeyi bul
+                        var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
+
+                        if (existingEntry.Equals(default(KeyValuePair<string, Dictionary<string, object>>)))
+                        {
+                            // componentName'a ait önceki öðe yoksa, yeni bir öðe oluþtur
+                            var newEntry = new KeyValuePair<string, Dictionary<string, object>>(componentName, new Dictionary<string, object>());
+                            newEntry.Value[$"{componentName}_{propertyName}"] = jsonData.value;
+
+                            // Yeni öðeyi jsonValues listesine ekle
+                            jsonValues.Add(newEntry);
+                        }
+                        else
+                        {
+                            // componentName'a ait önceki öðe varsa, deðeri güncelle
+                            existingEntry.Value[$"{componentName}_{propertyName}"] = jsonData.value;
+                        }
+                    }
+                }
+
+                Debug.Log("JSON dosyasý þuradan yüklendi: " + jsonFilePath);
+            }
+            else
+            {
+                Debug.LogError("JSON dosyasý yüklenemedi.");
+            }
+        }
+        else
+        {
+            Debug.Log("Belirtilen yerde JSON dosyasý bulunamadý: " + jsonFilePath);
+        }
+    }
+
+
+
 }

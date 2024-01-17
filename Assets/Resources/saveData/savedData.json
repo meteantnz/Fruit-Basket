@@ -1,0 +1,16 @@
+{
+    "_jsonValues": [
+        {
+            "key": "GameUI_scoreValue"
+        },
+        {
+            "key": "GameUI_scoreText"
+        },
+        {
+            "key": "FruitSpawner_meyveAdeti"
+        },
+        {
+            "key": "FruitSpawner_maxX"
+        }
+    ]
+}
