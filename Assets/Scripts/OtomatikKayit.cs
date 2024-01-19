@@ -5,6 +5,7 @@ using System.IO;
 using System;
 using System.Xml;
 using System.Linq;
+using static CombinedManagerWindow;
 
 public class CombinedManagerWindow : EditorWindow
 {
@@ -179,45 +180,59 @@ public class CombinedManagerWindow : EditorWindow
     {
         return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{propertyName}";
     }
-
+    private SerializableData _serializableData = new SerializableData();
     private void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
-        if (toggleState)
+        // componentName ve propertyName'e ait önceki öðeyi bul
+        var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
+
+        if (existingEntry.Equals(default(KeyValuePair<string, Dictionary<string, object>>)))
         {
-            // componentName'a ait önceki öðeyi bul
-            var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
-
-            if (existingEntry.Equals(default(KeyValuePair<string, Dictionary<string, object>>)))
-            {
-                // componentName'a ait önceki öðe yoksa, yeni bir öðe oluþtur
-                var newEntry = new JsonEntry
-                {
-                    Key = componentName,
-                    Values = new Dictionary<string, object>()
-                };
-                newEntry.Values[$"{componentName}_{propertyName}"] = value;
-
-                // Yeni öðeyi jsonValues listesine ekle
-                jsonValues.Add(new KeyValuePair<string, Dictionary<string, object>>(componentName, newEntry.Values));
-            }
-            else
-            {
-                // componentName'a ait önceki öðe varsa, deðeri güncelle
-                existingEntry.Value[$"{componentName}_{propertyName}"] = value;
-            }
-
-            // Burada _jsonValues listesini jsonValues listesine eþitleyin
-            SerializableData serializableData = new SerializableData();
-            serializableData._jsonValues = jsonValues.SelectMany(entry => entry.Value.Select(kv => new JsonData
-            {
-                key = kv.Key,
-                value = kv.Value
-            })).ToList();
-
-            Debug.Log("Debug - serializableData.jsonValues içeriði: " + JsonUtility.ToJson(serializableData._jsonValues, true));
-            Debug.Log($"UpdateJsonValue - componentName: {componentName}, propertyName: {propertyName}, value: {value}, toggleState: {toggleState}");
-            Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
+            // componentName'a ait önceki öðe yoksa, yeni bir öðe oluþtur
+            existingEntry = new KeyValuePair<string, Dictionary<string, object>>(
+                componentName,
+                new Dictionary<string, object>()
+            );
+            jsonValues.Add(existingEntry);
         }
+
+        // componentName'a ait önceki öðe varsa, deðeri güncelle
+        existingEntry.Value[propertyName] = value; // propertyName ve deðeri JSON'a ekleyin
+
+        // _jsonValues listesini oluþturun
+        List<JsonData> jsonDataList = jsonValues.SelectMany(entry =>
+        {
+            return entry.Value.Select(kv => new JsonData
+            {
+                key = $"{entry.Key}_{kv.Key}", // componentName'ý ve propertyName'ý birleþtir
+                componentName = entry.Key,       // componentName'ý ayrý bir alanda sakla
+                propertyName = kv.Key,           // propertyName'ý ayrý bir alanda sakla
+                value = kv.Value
+            });
+        }).ToList();
+
+        // jsonValues listesini güncelleyin
+        jsonValues = jsonDataList.GroupBy(jd => jd.componentName)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToDictionary(item => item.propertyName, item => item.value)
+            )
+            .Select(entry => new KeyValuePair<string, Dictionary<string, object>>(entry.Key, entry.Value))
+            .ToList();
+
+        // _serializableData._jsonValues'i güncelle
+        _serializableData._jsonValues = jsonDataList;
+
+        // Debug çýktýsý ekle
+        foreach (var jsonData in jsonDataList)
+        {
+            Debug.Log($"Component: {jsonData.componentName}, Property: {jsonData.propertyName}, Value: {jsonData.value}");
+        }
+
+        Debug.Log("Debug - _jsonValues içeriði: " + JsonUtility.ToJson(_serializableData._jsonValues, true));
+        Debug.Log("Debug - jsonValues: " + JsonUtility.ToJson(jsonValues, true));
+        Debug.Log($"UpdateJsonValue - componentName: {componentName}, propertyName: {propertyName}, value: {value}, toggleState: {toggleState}");
+        Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
     }
 
 
@@ -229,8 +244,11 @@ public class CombinedManagerWindow : EditorWindow
     public class JsonData
     {
         public string key;
+        public string componentName;
+        public string propertyName;
         public object value;
     }
+
 
     [System.Serializable]
     public class JsonEntry
@@ -248,25 +266,44 @@ public class CombinedManagerWindow : EditorWindow
 
     private void SaveToJson()
     {
-        // JsonData sýnýfýný kullanarak _jsonValues'e ekle
-        SerializableData serializableData = new SerializableData();
-        foreach (var entry in jsonValues)
+        try
         {
-            foreach (var item in entry.Value)
+            // _jsonValues listesini güncelleyin
+            _serializableData._jsonValues = jsonValues.SelectMany(entry =>
             {
-                JsonData jsonData = new JsonData();
-                jsonData.key = item.Key;
-                jsonData.value = item.Value;
-                serializableData._jsonValues.Add(jsonData);
+                return entry.Value.Select(kv => new JsonData
+                {
+                    key = $"{entry.Key}_{kv.Key}",
+                    componentName = entry.Key,
+                    propertyName = kv.Key,
+                    value = kv.Value
+                });
+            }).ToList();
+
+            // JSON dosyasýný oluþtur ve kaydet
+            string json = JsonUtility.ToJson(_serializableData, true);
+            File.WriteAllText(jsonFilePath, json);
+
+            // Deðerleri daha ayrýntýlý göstermek için JsonData nesnelerini yazdýr
+            foreach (var jsonData in _serializableData._jsonValues)
+            {
+                Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, Value: {jsonData.value}");
             }
+
+            Debug.Log($"JSON Ýçeriði (SaveToJson): {json}");
         }
-
-        // JSON verilerini dosyaya yazma
-        string json = JsonUtility.ToJson(serializableData, true);
-        File.WriteAllText(jsonFilePath, json);
-
-        Debug.Log($"JSON Ýçeriði (SaveToJson): {json}");
+        catch (Exception e)
+        {
+            Debug.LogError($"SaveToJson Hatasý: {e.Message}");
+        }
     }
+
+
+
+
+
+
+
 
     private void LoadJsonValues()
     {
@@ -279,45 +316,16 @@ public class CombinedManagerWindow : EditorWindow
             // JSON verilerini dosyadan okuma ve deserializasyon iþlemi
             SerializableData loadedData = JsonUtility.FromJson<SerializableData>(json);
 
-            if (loadedData != null)
+            if (loadedData != null && loadedData._jsonValues != null)
             {
-                // jsonValues listesini temizle
-                jsonValues.Clear();
-
-                foreach (var jsonData in loadedData._jsonValues)
-                {
-                    // jsonValues listesine elemanlarý ekleyin
-                    var keyParts = jsonData.key.Split('_');
-                    if (keyParts.Length == 2)
-                    {
-                        var componentName = keyParts[0];
-                        var propertyName = keyParts[1];
-
-                        // componentName'a ait önceki öðeyi bul
-                        var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
-
-                        if (existingEntry.Equals(default(KeyValuePair<string, Dictionary<string, object>>)))
-                        {
-                            // componentName'a ait önceki öðe yoksa, yeni bir öðe oluþtur
-                            var newEntry = new KeyValuePair<string, Dictionary<string, object>>(componentName, new Dictionary<string, object>());
-                            newEntry.Value[$"{componentName}_{propertyName}"] = jsonData.value;
-
-                            // Yeni öðeyi jsonValues listesine ekle
-                            jsonValues.Add(newEntry);
-                        }
-                        else
-                        {
-                            // componentName'a ait önceki öðe varsa, deðeri güncelle
-                            existingEntry.Value[$"{componentName}_{propertyName}"] = jsonData.value;
-                        }
-                    }
-                }
+                // _jsonValues listesini güncelle
+                _serializableData._jsonValues = loadedData._jsonValues.ToList();
 
                 Debug.Log("JSON dosyasý þuradan yüklendi: " + jsonFilePath);
             }
             else
             {
-                Debug.LogError("JSON dosyasý yüklenemedi.");
+                Debug.LogError("JSON dosyasý yüklenemedi veya _jsonValues boþ.");
             }
         }
         else
@@ -325,6 +333,8 @@ public class CombinedManagerWindow : EditorWindow
             Debug.Log("Belirtilen yerde JSON dosyasý bulunamadý: " + jsonFilePath);
         }
     }
+
+
 
 
 

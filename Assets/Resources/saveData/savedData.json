@@ -1,16 +1,19 @@
 {
     "_jsonValues": [
         {
-            "key": "GameUI_scoreValue"
+            "key": "FruitSpawner_minX",
+            "componentName": "FruitSpawner",
+            "propertyName": "minX"
         },
         {
-            "key": "GameUI_scoreText"
+            "key": "FruitSpawner_maxX",
+            "componentName": "FruitSpawner",
+            "propertyName": "maxX"
         },
         {
-            "key": "FruitSpawner_meyveAdeti"
-        },
-        {
-            "key": "FruitSpawner_maxX"
+            "key": "FruitSpawner_meyveAdeti",
+            "componentName": "FruitSpawner",
+            "propertyName": "meyveAdeti"
         }
     ]
 }
