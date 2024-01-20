@@ -3,7 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using System;
-using System.Xml;
+using System.Globalization;
 using System.Linq;
 using static CombinedManagerWindow;
 
@@ -14,6 +14,7 @@ public class CombinedManagerWindow : EditorWindow
     private GameObject draggedGameObject;
     private List<MonoBehaviour> scriptComponents = new List<MonoBehaviour>();
     private Dictionary<string, bool> toggleValues = new Dictionary<string, bool>();
+    private SerializableData _serializableData = new SerializableData();
 
     [MenuItem("Window/Özel Editör Penceresi")]
     public static void ShowWindow()
@@ -180,7 +181,32 @@ public class CombinedManagerWindow : EditorWindow
     {
         return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{propertyName}";
     }
-    private SerializableData _serializableData = new SerializableData();
+    
+
+    // JSON verilerini serileþtirmek ve deserializasyon yapmak için kullanýlacak sýnýf
+    [System.Serializable]
+    public class JsonData
+    {
+        public string key;
+        public string componentName;
+        public string propertyName;
+        public string originalType; // Yeni eklenen alan: orijinal veri tipini saklar
+        public string value;
+    }
+
+
+    [System.Serializable]
+    public class JsonEntry
+    {
+        public string Key;
+        public Dictionary<string, object> Values;
+    }
+
+    [System.Serializable]
+    public class SerializableData
+    {
+        public List<JsonData> _jsonValues = new List<JsonData>();
+    }
     private void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
         // componentName ve propertyName'e ait önceki öðeyi bul
@@ -197,17 +223,18 @@ public class CombinedManagerWindow : EditorWindow
         }
 
         // componentName'a ait önceki öðe varsa, deðeri güncelle
-        existingEntry.Value[propertyName] = value; // propertyName ve deðeri JSON'a ekleyin
+        existingEntry.Value[propertyName] = value;
 
         // _jsonValues listesini oluþturun
         List<JsonData> jsonDataList = jsonValues.SelectMany(entry =>
         {
             return entry.Value.Select(kv => new JsonData
             {
-                key = $"{entry.Key}_{kv.Key}", // componentName'ý ve propertyName'ý birleþtir
-                componentName = entry.Key,       // componentName'ý ayrý bir alanda sakla
-                propertyName = kv.Key,           // propertyName'ý ayrý bir alanda sakla
-                value = kv.Value
+                key = $"{entry.Key}_{kv.Key}",
+                componentName = entry.Key,
+                propertyName = kv.Key,
+                originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
+                value = ConvertToString(kv.Value) // Deðerleri stringe dönüþtür
             });
         }).ToList();
 
@@ -215,7 +242,7 @@ public class CombinedManagerWindow : EditorWindow
         jsonValues = jsonDataList.GroupBy(jd => jd.componentName)
             .ToDictionary(
                 group => group.Key,
-                group => group.ToDictionary(item => item.propertyName, item => item.value)
+                group => group.ToDictionary(item => item.propertyName, item => ConvertFromString(item.originalType, item.value)) // Deðerleri geri çevir
             )
             .Select(entry => new KeyValuePair<string, Dictionary<string, object>>(entry.Key, entry.Value))
             .ToList();
@@ -226,41 +253,13 @@ public class CombinedManagerWindow : EditorWindow
         // Debug çýktýsý ekle
         foreach (var jsonData in jsonDataList)
         {
-            Debug.Log($"Component: {jsonData.componentName}, Property: {jsonData.propertyName}, Value: {jsonData.value}");
+            Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
         }
 
         Debug.Log("Debug - _jsonValues içeriði: " + JsonUtility.ToJson(_serializableData._jsonValues, true));
         Debug.Log("Debug - jsonValues: " + JsonUtility.ToJson(jsonValues, true));
         Debug.Log($"UpdateJsonValue - componentName: {componentName}, propertyName: {propertyName}, value: {value}, toggleState: {toggleState}");
         Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
-    }
-
-
-
-
-
-    // JSON verilerini serileþtirmek ve deserializasyon yapmak için kullanýlacak sýnýf
-    [System.Serializable]
-    public class JsonData
-    {
-        public string key;
-        public string componentName;
-        public string propertyName;
-        public object value;
-    }
-
-
-    [System.Serializable]
-    public class JsonEntry
-    {
-        public string Key;
-        public Dictionary<string, object> Values;
-    }
-
-    [System.Serializable]
-    public class SerializableData
-    {
-        public List<JsonData> _jsonValues = new List<JsonData>();
     }
 
 
@@ -276,7 +275,8 @@ public class CombinedManagerWindow : EditorWindow
                     key = $"{entry.Key}_{kv.Key}",
                     componentName = entry.Key,
                     propertyName = kv.Key,
-                    value = kv.Value
+                    originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
+                    value = ConvertToString(kv.Value) // Deðerleri stringe dönüþtür
                 });
             }).ToList();
 
@@ -287,7 +287,9 @@ public class CombinedManagerWindow : EditorWindow
             // Deðerleri daha ayrýntýlý göstermek için JsonData nesnelerini yazdýr
             foreach (var jsonData in _serializableData._jsonValues)
             {
-                Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, Value: {jsonData.value}");
+                jsonData.value = ConvertFromString(jsonData.originalType, jsonData.value) as string; // Deðerleri orijinal türlerine çevir
+
+                Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
             }
 
             Debug.Log($"JSON Ýçeriði (SaveToJson): {json}");
@@ -297,11 +299,6 @@ public class CombinedManagerWindow : EditorWindow
             Debug.LogError($"SaveToJson Hatasý: {e.Message}");
         }
     }
-
-
-
-
-
 
 
 
@@ -334,8 +331,63 @@ public class CombinedManagerWindow : EditorWindow
         }
     }
 
+    private string GetOriginalTypeString(object value)
+    {
+        if (value == null)
+        {
+            return "null";
+        }
+        else
+        {
+            return value.GetType().FullName; // Orijinal türün tam adýný kullanabilirsiniz
+        }
+    }
 
+    private string ConvertToString(object value)
+    {
+        if (value == null)
+        {
+            return "null";
+        }
+        else if (value is int || value is float || value is bool)
+        {
+            // Sayýsal deðerleri kültür bilgisini kullanarak nokta ile ayýr
+            return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            // Diðer türler için özel durumlar ekleme
+            return value.ToString();
+        }
+    }
 
+    // Deðerleri string'e dönüþtüren yardýmcý metod
+    private object ConvertFromString(string originalType, string valueString)
+    {
+        if (originalType == typeof(int).FullName)
+        {
+            int result;
+            if (int.TryParse(valueString, out result))
+            {
+                return result;
+            }
+        }
+        else if (originalType == typeof(float).FullName)
+        {
+            float result;
+            // Virgülle ayrýlmýþ sayýlarý noktaya dönüþtür
+            if (float.TryParse(valueString.Replace('.', ','), out result))
+            {
+                return result;
+            }
+        }
+        else if (originalType == typeof(string).FullName)
+        {
+            return valueString;
+        }
+        // Diðer türler için gerekirse daha fazla durum ekle
 
-
+        // Bilinmeyen tür için varsayýlan olarak string döndür
+        return valueString;
+    }
 }

@@ -3,17 +3,30 @@
         {
             "key": "FruitSpawner_minX",
             "componentName": "FruitSpawner",
-            "propertyName": "minX"
+            "propertyName": "minX",
+            "originalType": "System.Single",
+            "value": "-2.39"
         },
         {
             "key": "FruitSpawner_maxX",
             "componentName": "FruitSpawner",
-            "propertyName": "maxX"
+            "propertyName": "maxX",
+            "originalType": "System.Single",
+            "value": "2.39"
         },
         {
-            "key": "FruitSpawner_meyveAdeti",
+            "key": "FruitSpawner_spawnInterval",
             "componentName": "FruitSpawner",
-            "propertyName": "meyveAdeti"
+            "propertyName": "spawnInterval",
+            "originalType": "System.Single",
+            "value": "0.5"
+        },
+        {
+            "key": "FruitSpawner_meyveIndex",
+            "componentName": "FruitSpawner",
+            "propertyName": "meyveIndex",
+            "originalType": "System.Int32",
+            "value": "0"
         }
     ]
 }
