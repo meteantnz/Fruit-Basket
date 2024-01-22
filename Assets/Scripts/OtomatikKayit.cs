@@ -6,6 +6,8 @@ using System;
 using System.Globalization;
 using System.Linq;
 using static CombinedManagerWindow;
+using System.Collections;
+using static UnityEngine.Rendering.DebugUI;
 
 public class CombinedManagerWindow : EditorWindow
 {
@@ -34,6 +36,9 @@ public class CombinedManagerWindow : EditorWindow
         SaveToJson();
         Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
+
+
+
 
     private void OnGUI()
     {
@@ -104,14 +109,11 @@ public class CombinedManagerWindow : EditorWindow
                         SetPropertyVisibility(scriptComponents[i], fieldInfo.Name, newVisibility);
                     }
 
-                    // Yeni kod, alan deðerini doðrudan görüntülemek ve düzenlemek için
                     object value = fieldInfo.GetValue(scriptComponents[i]);
                     Type fieldType = fieldInfo.FieldType;
 
-                    // Alan etiketini görüntüle
                     GUILayout.Label(":", GUILayout.Width(5));
 
-                    // Alan deðerini görüntüle ve düzenle
                     if (fieldType == typeof(int))
                     {
                         int newValue = EditorGUILayout.IntField((int)value, GUILayout.Width(60));
@@ -127,25 +129,20 @@ public class CombinedManagerWindow : EditorWindow
                         string newValue = EditorGUILayout.TextField((string)value, GUILayout.Width(80));
                         fieldInfo.SetValue(scriptComponents[i], newValue);
                     }
-                    // Diðer alan türleri için gerekirse daha fazla durum ekle
 
                     GUILayout.EndHorizontal();
 
                     if (newVisibility)
                     {
-                        // Toggle'ýn kimliðini oluþtur
                         string toggleKey = $"{scriptComponents[i].GetType().Name}_{fieldInfo.Name}";
-
-                        // Kimlikle birlikte JSON deðerini güncelle
                         UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldInfo.GetValue(scriptComponents[i]), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
-
-                        // Toggle durumunu güncelle
                         toggleValues[toggleKey] = newVisibility;
                     }
                 }
             }
         }
     }
+
 
     private void ScriptleriTara()
     {
@@ -161,9 +158,39 @@ public class CombinedManagerWindow : EditorWindow
                 // Toggle'ý varsayýlan olarak false olarak ayarla
                 string toggleKey = $"{script.GetType().Name}_";
                 toggleValues[toggleKey] = false;
+
+                // Debug mesajlarý ekle
+                Debug.Log($"Oyun Öncesi - ScriptleriTara Metodu - Script Component: {script.GetType().Name}");
+
+                // Script component'in public alan deðerlerini yazdýr
+                System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                foreach (var fieldInfo in fields)
+                {
+                    // Özel durum: Eðer alanýn türü List ise, listenin elemanlarýný yazdýr
+                    if (fieldInfo.FieldType.IsGenericType && fieldInfo.FieldType.GetGenericTypeDefinition() == typeof(List<>))
+                    {
+                        IList list = fieldInfo.GetValue(script) as IList;
+
+                        if (list != null)
+                        {
+                            for (int i = 0; i < list.Count; i++)
+                            {
+                                Debug.Log($"- {fieldInfo.Name}[{i}]: {list[i] ?? "null"}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Diðer türler için normal deðeri yazdýr
+                        object value = fieldInfo.GetValue(script);
+                        Debug.Log($"- {fieldInfo.Name}: {value ?? "null"}");
+                    }
+                }
             }
         }
     }
+
 
     private void SetPropertyVisibility(MonoBehaviour scriptComponent, string propertyName, bool visibility)
     {
@@ -181,7 +208,6 @@ public class CombinedManagerWindow : EditorWindow
     {
         return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{propertyName}";
     }
-    
 
     // JSON verilerini serileþtirmek ve deserializasyon yapmak için kullanýlacak sýnýf
     [System.Serializable]
@@ -207,7 +233,7 @@ public class CombinedManagerWindow : EditorWindow
     {
         public List<JsonData> _jsonValues = new List<JsonData>();
     }
-    private void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
+    public void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
         // componentName ve propertyName'e ait önceki öðeyi bul
         var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
@@ -223,6 +249,9 @@ public class CombinedManagerWindow : EditorWindow
         }
 
         // componentName'a ait önceki öðe varsa, deðeri güncelle
+        
+        ScriptleriTara();
+
         existingEntry.Value[propertyName] = value;
 
         // _jsonValues listesini oluþturun
@@ -260,7 +289,11 @@ public class CombinedManagerWindow : EditorWindow
         Debug.Log("Debug - jsonValues: " + JsonUtility.ToJson(jsonValues, true));
         Debug.Log($"UpdateJsonValue - componentName: {componentName}, propertyName: {propertyName}, value: {value}, toggleState: {toggleState}");
         Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
+
+        Debug.Log("UpdateJsonValue Çalýþtý");
     }
+
+
 
 
     private void SaveToJson()
