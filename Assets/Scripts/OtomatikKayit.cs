@@ -17,6 +17,7 @@ public class CombinedManagerWindow : EditorWindow
     private List<MonoBehaviour> scriptComponents = new List<MonoBehaviour>();
     private Dictionary<string, bool> toggleValues = new Dictionary<string, bool>();
     private SerializableData _serializableData = new SerializableData();
+    private Dictionary<MonoBehaviour, Dictionary<string, object>> previousComponentValues = new Dictionary<MonoBehaviour, Dictionary<string, object>>();
 
     [MenuItem("Window/Özel Editör Penceresi")]
     public static void ShowWindow()
@@ -37,9 +38,21 @@ public class CombinedManagerWindow : EditorWindow
         Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
 
+    private void Update()
+    {
+        // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýrmak için kontrol
+        bool changesDetected = CheckForChanges();
 
+        if (changesDetected)
+        {
+            // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýr
+            Repaint();
+        }
 
+        // Geri kalan Update fonksiyonu içeriði...
+    }
 
+    
     private void OnGUI()
     {
         Event currentEvent = Event.current;
@@ -249,7 +262,7 @@ public class CombinedManagerWindow : EditorWindow
         }
 
         // componentName'a ait önceki öðe varsa, deðeri güncelle
-        
+
         ScriptleriTara();
 
         existingEntry.Value[propertyName] = value;
@@ -291,9 +304,8 @@ public class CombinedManagerWindow : EditorWindow
         Debug.Log($"JSON deðeri güncellendi: {componentName}.{propertyName} = {value}");
 
         Debug.Log("UpdateJsonValue Çalýþtý");
+
     }
-
-
 
 
     private void SaveToJson()
@@ -422,5 +434,69 @@ public class CombinedManagerWindow : EditorWindow
 
         // Bilinmeyen tür için varsayýlan olarak string döndür
         return valueString;
+    }
+
+    private bool CheckForChanges()
+    {
+        bool changesDetected = false;
+
+        if (draggedGameObject != null)
+        {
+            scriptComponents.Clear();
+            MonoBehaviour[] scripts = draggedGameObject.GetComponents<MonoBehaviour>();
+
+            foreach (var script in scripts)
+            {
+                scriptComponents.Add(script);
+
+                // Önceki durumu kontrol etmek için bir sözlük oluþtur
+                if (!previousComponentValues.ContainsKey(script))
+                {
+                    previousComponentValues[script] = new Dictionary<string, object>();
+                }
+
+                // Farklýlýk kontrolü yap
+                changesDetected |= CheckForChanges(script);
+            }
+        }
+
+        return changesDetected;
+    }
+    private bool CheckForChanges(MonoBehaviour script)
+    {
+        Dictionary<string, object> previousValues = previousComponentValues[script];
+        bool changesDetected = false;
+
+        System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+        foreach (var fieldInfo in fields)
+        {
+            object currentValue = fieldInfo.GetValue(script);
+            string fieldName = fieldInfo.Name;
+
+            // Önceki deðer var mý kontrol et
+            if (previousValues.ContainsKey(fieldName))
+            {
+                object previousValue = previousValues[fieldName];
+
+                // Farklýlýk var mý kontrol et
+                if (!UnityEngine.Object.Equals(currentValue, previousValue))
+                {
+                    changesDetected = true;
+
+                    // Önceki deðeri güncelle
+                    previousValues[fieldName] = currentValue;
+
+                    break;  // Farklýlýk bulunduðu için döngüyü sonlandýr
+                }
+            }
+            else
+            {
+                // Önceki deðeri güncelle
+                previousValues[fieldName] = currentValue;
+            }
+        }
+
+        return changesDetected;
     }
 }

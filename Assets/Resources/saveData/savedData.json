@@ -5,7 +5,7 @@
             "componentName": "GameUI",
             "propertyName": "scoreText",
             "originalType": "System.String",
-            "value": "null"
+            "value": ""
         },
         {
             "key": "GameUI_scoreValue",
