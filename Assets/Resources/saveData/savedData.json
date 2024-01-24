@@ -5,14 +5,14 @@
             "componentName": "GameUI",
             "propertyName": "scoreText",
             "originalType": "System.String",
-            "value": ""
+            "value": "95"
         },
         {
             "key": "GameUI_scoreValue",
             "componentName": "GameUI",
             "propertyName": "scoreValue",
             "originalType": "System.Int32",
-            "value": "0"
+            "value": "95"
         }
     ]
 }
