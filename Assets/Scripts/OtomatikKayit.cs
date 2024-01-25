@@ -36,17 +36,14 @@ public class CombinedManagerWindow : EditorWindow
     private void OnDisable()
     {
         OnValueChanged -= HandleValueChanged;
-        if (EditorApplication.isPlaying)
-        {
-            SaveToJson();
-            Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
-        }
 
+        Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
     private void Awake()
     {
         LoadJsonValues();
         Debug.Log("CombinedManagerWindow awake metodu çaðrýldý");
+
     }
 
     private void OnDestroy()
@@ -70,7 +67,7 @@ public class CombinedManagerWindow : EditorWindow
         // Geri kalan Update fonksiyonu içeriði...
     }
 
-    
+
     private void OnGUI()
     {
         Event currentEvent = Event.current;
@@ -104,6 +101,7 @@ public class CombinedManagerWindow : EditorWindow
 
         if (draggedGameObject != null)
         {
+            SaveToJson();
             GUILayout.BeginHorizontal();
 
             EditorGUILayout.ObjectField(draggedGameObject, typeof(GameObject), false);
@@ -115,6 +113,7 @@ public class CombinedManagerWindow : EditorWindow
                 toggleValues.Clear();
                 jsonValues.Clear();
             }
+
 
             GUILayout.EndHorizontal();
 
@@ -160,6 +159,7 @@ public class CombinedManagerWindow : EditorWindow
                         string newValue = EditorGUILayout.TextField((string)value, GUILayout.Width(60));
                         fieldInfo.SetValue(scriptComponents[i], newValue);
                     }
+
 
                     GUILayout.EndHorizontal();
 
@@ -313,7 +313,7 @@ public class CombinedManagerWindow : EditorWindow
         // Debug çýktýsý ekle
         foreach (var jsonData in jsonDataList)
         {
-            Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
+            //Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
         }
 
         // SaveToJson fonksiyonunu çaðýr
@@ -324,42 +324,41 @@ public class CombinedManagerWindow : EditorWindow
 
     private void SaveToJson()
     {
-        if (EditorApplication.isPlaying)
+
+        try
         {
-            try
+            // _jsonValues listesini güncelleyin
+            _serializableData._jsonValues = jsonValues.SelectMany(entry =>
             {
-                // _jsonValues listesini güncelleyin
-                _serializableData._jsonValues = jsonValues.SelectMany(entry =>
+                return entry.Value.Select(kv => new JsonData
                 {
-                    return entry.Value.Select(kv => new JsonData
-                    {
-                        key = $"{entry.Key}_{kv.Key}",
-                        componentName = entry.Key,
-                        propertyName = kv.Key,
-                        originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
-                        value = ConvertToString(kv.Value) // Deðerleri stringe dönüþtür
-                    });
-                }).ToList();
+                    key = $"{entry.Key}_{kv.Key}",
+                    componentName = entry.Key,
+                    propertyName = kv.Key,
+                    originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
+                    value = ConvertToString(kv.Value) // Deðerleri stringe dönüþtür
+                });
+            }).ToList();
 
-                // JSON dosyasýný oluþtur ve kaydet
-                string json = JsonUtility.ToJson(_serializableData, true);
-                File.WriteAllText(jsonFilePath, json);
+            // JSON dosyasýný oluþtur ve kaydet
+            string json = JsonUtility.ToJson(_serializableData, true);
+            File.WriteAllText(jsonFilePath, json);
 
-                // Deðerleri daha ayrýntýlý göstermek için JsonData nesnelerini yazdýr
-                foreach (var jsonData in _serializableData._jsonValues)
-                {
-                    jsonData.value = ConvertFromString(jsonData.originalType, jsonData.value) as string; // Deðerleri orijinal türlerine çevir
-
-                    //Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
-                }
-
-                Debug.Log($"JSON Ýçeriði (SaveToJson): {json}");
-            }
-            catch (Exception e)
+            // Deðerleri daha ayrýntýlý göstermek için JsonData nesnelerini yazdýr
+            foreach (var jsonData in _serializableData._jsonValues)
             {
-                Debug.LogError($"SaveToJson Hatasý: {e.Message}");
+                jsonData.value = ConvertFromString(jsonData.originalType, jsonData.value) as string; // Deðerleri orijinal türlerine çevir
+
+                //Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
             }
+
+            Debug.Log($"JSON Ýçeriði (SaveToJson): {json}");
         }
+        catch (Exception e)
+        {
+            Debug.LogError($"SaveToJson Hatasý: {e.Message}");
+        }
+
     }
 
 
@@ -404,7 +403,7 @@ public class CombinedManagerWindow : EditorWindow
                                 fieldInfo.SetValue(script, loadedValue);
 
                                 // Deðer deðiþikliðini tetikle
-                                
+
                             }
                         }
                     }
@@ -467,7 +466,7 @@ public class CombinedManagerWindow : EditorWindow
     // Deðerleri string'e dönüþtüren yardýmcý metod
     private object ConvertFromString(string originalType, string valueString)
     {
-        Debug.Log($"String'den deðer dönüþtürülüyor: {valueString}");
+        //Debug.Log($"String'den deðer dönüþtürülüyor: {valueString}");
 
         object result = null;
 
@@ -507,7 +506,7 @@ public class CombinedManagerWindow : EditorWindow
             Debug.LogError($"ConvertFromString Hatasý: {e.Message}");
         }
 
-        Debug.Log($"Dönüþtürülen deðer: {result}");
+        //Debug.Log($"Dönüþtürülen deðer: {result}");
 
         return result;
     }
@@ -539,6 +538,7 @@ public class CombinedManagerWindow : EditorWindow
 
         return changesDetected;
     }
+
     private bool CheckForChanges(MonoBehaviour script)
     {
         Dictionary<string, object> previousValues = previousComponentValues[script];
@@ -573,10 +573,6 @@ public class CombinedManagerWindow : EditorWindow
                 previousValues[fieldName] = currentValue;
             }
         }
-        foreach (var kvp in previousValues)
-        {
-            //Debug.Log($"{script.GetType().Name}.{kvp.Key} - Previous Value: {kvp.Value}");
-        }
 
         return changesDetected;
     }
@@ -591,7 +587,7 @@ public class CombinedManagerWindow : EditorWindow
             {
                 if (script.GetType().Name == componentName)
                 {
-                    Debug.Log($"Script component found for {componentName}: {script.GetType().Name}");
+                    //Debug.Log($"Script component found for {componentName}: {script.GetType().Name}");
                     return script;
                 }
             }
