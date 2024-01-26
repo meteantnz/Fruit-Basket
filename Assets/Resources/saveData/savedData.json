@@ -6,55 +6,6 @@
             "propertyName": "scoreValue",
             "originalType": "System.Int32",
             "value": "300"
-        },
-        {
-            "key": "FruitSpawner_fruitList",
-            "componentName": "FruitSpawner",
-            "propertyName": "fruitList",
-            "originalType": "System.String",
-            "value": "System.Collections.Generic.List`1[Fruit]"
-        },
-        {
-            "key": "FruitSpawner_minX",
-            "componentName": "FruitSpawner",
-            "propertyName": "minX",
-            "originalType": "System.Single",
-            "value": "-2.39"
-        },
-        {
-            "key": "FruitSpawner_maxX",
-            "componentName": "FruitSpawner",
-            "propertyName": "maxX",
-            "originalType": "System.Single",
-            "value": "2.39"
-        },
-        {
-            "key": "FruitSpawner_ySpawnHeight",
-            "componentName": "FruitSpawner",
-            "propertyName": "ySpawnHeight",
-            "originalType": "System.Single",
-            "value": "7"
-        },
-        {
-            "key": "FruitSpawner_meyveAdeti",
-            "componentName": "FruitSpawner",
-            "propertyName": "meyveAdeti",
-            "originalType": "System.Int32",
-            "value": "20"
-        },
-        {
-            "key": "FruitSpawner_spawnInterval",
-            "componentName": "FruitSpawner",
-            "propertyName": "spawnInterval",
-            "originalType": "System.Single",
-            "value": "0.5"
-        },
-        {
-            "key": "FruitSpawner_meyveIndex",
-            "componentName": "FruitSpawner",
-            "propertyName": "meyveIndex",
-            "originalType": "System.Int32",
-            "value": "0"
         }
     ]
 }
