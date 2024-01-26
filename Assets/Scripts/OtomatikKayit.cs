@@ -19,6 +19,8 @@ public class CombinedManagerWindow : EditorWindow
     public static event Action<string, string, object> OnValueChanged;
     private Dictionary<string, bool> scriptFoldouts = new Dictionary<string, bool>();
     private string currentGameObjectKey = "";
+    private List<GameObject> draggedGameObjectsList = new List<GameObject>();
+    private bool foldout = true;
 
 
     [MenuItem("Window/Özel Editör Penceresi")]
@@ -121,7 +123,6 @@ public class CombinedManagerWindow : EditorWindow
             SaveToJson();
             GUILayout.BeginHorizontal();
 
-
             EditorGUILayout.ObjectField(draggedGameObject, typeof(GameObject), false);
 
             if (GUILayout.Button("Kaldýr"))
@@ -132,10 +133,16 @@ public class CombinedManagerWindow : EditorWindow
                 jsonValues.Clear();
             }
 
-
             GUILayout.EndHorizontal();
 
             EditorGUILayout.Space(5f);
+
+            // Objeyi otomatik olarak listeye ekle
+            if (draggedGameObject != null && !draggedGameObjectsList.Contains(draggedGameObject))
+            {
+                draggedGameObjectsList.Add(draggedGameObject);
+                Repaint();
+            }
 
             for (int i = 0; i < scriptComponents.Count; i++)
             {
@@ -184,7 +191,6 @@ public class CombinedManagerWindow : EditorWindow
                             fieldInfo.SetValue(scriptComponents[i], newValue);
                         }
 
-
                         GUILayout.EndHorizontal();
 
                         if (newVisibility)
@@ -196,7 +202,62 @@ public class CombinedManagerWindow : EditorWindow
                     }
                 }
             }
+
+            GUILayout.Space(10f);
+
+            foldout = EditorGUILayout.Foldout(foldout, "Sürüklenen Game Object'ler", true);
+
+            if (foldout)
+            {
+                EditorGUI.indentLevel++;
+
+                // Sürüklenen Game Object'leri liste içinde göster
+                for (int i = draggedGameObjectsList.Count - 1; i >= 0; i--)
+                {
+                    EditorGUILayout.BeginHorizontal();
+
+                    EditorGUILayout.ObjectField(draggedGameObjectsList[i], typeof(GameObject), false);
+
+                    if (GUILayout.Button("Kaldýr"))
+                    {
+                        if (draggedGameObjectsList[i] != draggedGameObject)
+                        {
+                            // Eðer referanslar ayný deðilse, yani sürüklenen obje ile listedeki obje farklýysa
+                            draggedGameObjectsList.RemoveAt(i);
+                        }
+                        // Eðer referanslar aynýysa, yani sürüklenen obje ile listedeki obje aynýysa, boþ iþlem yap
+                    }
+
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                // Tüm döngü bittikten sonra Repaint() çaðrýsý yap
+
+                EditorGUI.indentLevel--;
+
+                // draggedGameObject'u otomatik olarak listeye ekle
+                if (draggedGameObject != null && !draggedGameObjectsList.Contains(draggedGameObject))
+                {
+                    draggedGameObjectsList.Add(draggedGameObject);
+                    Repaint();
+                }
+            }
         }
+    }
+
+    private void OnSelectionChange()
+    {
+        draggedGameObjectsList.Clear();
+
+        foreach (var selectedObject in Selection.objects)
+        {
+            if (selectedObject is GameObject)
+            {
+                draggedGameObjectsList.Add(selectedObject as GameObject);
+            }
+        }
+
+        Repaint();
     }
 
     private string GetFoldoutKey(MonoBehaviour scriptComponent)
