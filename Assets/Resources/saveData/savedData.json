@@ -1,18 +1,11 @@
 {
     "_jsonValues": [
         {
-            "key": "GameUI_scoreText",
-            "componentName": "GameUI",
-            "propertyName": "scoreText",
-            "originalType": "System.String",
-            "value": "null"
-        },
-        {
             "key": "GameUI_scoreValue",
             "componentName": "GameUI",
             "propertyName": "scoreValue",
             "originalType": "System.Int32",
-            "value": "85"
+            "value": "150"
         }
     ]
 }

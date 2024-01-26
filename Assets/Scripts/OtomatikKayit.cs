@@ -17,6 +17,8 @@ public class CombinedManagerWindow : EditorWindow
     private SerializableData _serializableData = new SerializableData();
     private Dictionary<MonoBehaviour, Dictionary<string, object>> previousComponentValues = new Dictionary<MonoBehaviour, Dictionary<string, object>>();
     public static event Action<string, string, object> OnValueChanged;
+    private Dictionary<string, bool> scriptFoldouts = new Dictionary<string, bool>();
+    private string currentGameObjectKey = "";
 
 
     [MenuItem("Window/Özel Editör Penceresi")]
@@ -30,12 +32,27 @@ public class CombinedManagerWindow : EditorWindow
         jsonValues = new List<KeyValuePair<string, Dictionary<string, object>>>();
         LoadJsonValues();
         OnValueChanged += HandleValueChanged;
+
+        // scriptFoldouts sözlüðünü EditorPrefs'ten yükle
+        foreach (var scriptComponent in scriptComponents)
+        {
+            string key = GetFoldoutKey(scriptComponent);
+            scriptFoldouts[scriptComponent.GetType().Name] = EditorPrefs.GetBool(key, true);
+        }
+
         Debug.Log("CombinedManagerWindow etkinleþtirildi");
     }
 
     private void OnDisable()
     {
         OnValueChanged -= HandleValueChanged;
+
+        // scriptFoldouts sözlüðünü EditorPrefs'e kaydet
+        foreach (var scriptComponent in scriptComponents)
+        {
+            string key = GetFoldoutKey(scriptComponent);
+            EditorPrefs.SetBool(key, scriptFoldouts[scriptComponent.GetType().Name]);
+        }
 
         Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
@@ -104,6 +121,7 @@ public class CombinedManagerWindow : EditorWindow
             SaveToJson();
             GUILayout.BeginHorizontal();
 
+
             EditorGUILayout.ObjectField(draggedGameObject, typeof(GameObject), false);
 
             if (GUILayout.Button("Kaldýr"))
@@ -117,63 +135,75 @@ public class CombinedManagerWindow : EditorWindow
 
             GUILayout.EndHorizontal();
 
+            EditorGUILayout.Space(5f);
+
             for (int i = 0; i < scriptComponents.Count; i++)
             {
                 GUILayout.BeginHorizontal();
 
-                GUILayout.Label(scriptComponents[i].GetType().Name);
+                scriptFoldouts.TryGetValue(scriptComponents[i].GetType().Name, out bool isFoldout);
+                bool newFoldout = EditorGUILayout.Foldout(isFoldout, " " + scriptComponents[i].GetType().Name, true);
+                scriptFoldouts[scriptComponents[i].GetType().Name] = newFoldout;
 
                 GUILayout.EndHorizontal();
 
-                System.Reflection.FieldInfo[] fields = scriptComponents[i].GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                foreach (var fieldInfo in fields)
+                if (newFoldout)
                 {
-                    GUILayout.BeginHorizontal();
+                    System.Reflection.FieldInfo[] fields = scriptComponents[i].GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-                    bool showProperty = GetPropertyVisibility(scriptComponents[i], fieldInfo.Name);
-                    bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty, GUILayout.Width(120));
-
-                    if (newVisibility != showProperty)
+                    foreach (var fieldInfo in fields)
                     {
-                        SetPropertyVisibility(scriptComponents[i], fieldInfo.Name, newVisibility);
-                    }
+                        GUILayout.BeginHorizontal();
 
-                    object value = fieldInfo.GetValue(scriptComponents[i]);
-                    Type fieldType = fieldInfo.FieldType;
+                        bool showProperty = GetPropertyVisibility(scriptComponents[i], fieldInfo.Name);
+                        bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty, GUILayout.Width(120));
 
-                    GUILayout.Label(":", GUILayout.Width(5));
+                        if (newVisibility != showProperty)
+                        {
+                            SetPropertyVisibility(scriptComponents[i], fieldInfo.Name, newVisibility);
+                        }
 
-                    if (fieldType == typeof(int))
-                    {
-                        int newValue = EditorGUILayout.IntField((int)value, GUILayout.Width(60));
-                        fieldInfo.SetValue(scriptComponents[i], newValue);
-                    }
-                    else if (fieldType == typeof(float))
-                    {
-                        float newValue = EditorGUILayout.FloatField((float)value, GUILayout.Width(60));
-                        fieldInfo.SetValue(scriptComponents[i], newValue);
-                    }
-                    else if (fieldType == typeof(string))
-                    {
-                        string newValue = EditorGUILayout.TextField((string)value, GUILayout.Width(60));
-                        fieldInfo.SetValue(scriptComponents[i], newValue);
-                    }
+                        object value = fieldInfo.GetValue(scriptComponents[i]);
+                        Type fieldType = fieldInfo.FieldType;
+
+                        GUILayout.Label(":", GUILayout.Width(5));
+
+                        if (fieldType == typeof(int))
+                        {
+                            int newValue = EditorGUILayout.IntField((int)value, GUILayout.Width(60));
+                            fieldInfo.SetValue(scriptComponents[i], newValue);
+                        }
+                        else if (fieldType == typeof(float))
+                        {
+                            float newValue = EditorGUILayout.FloatField((float)value, GUILayout.Width(60));
+                            fieldInfo.SetValue(scriptComponents[i], newValue);
+                        }
+                        else if (fieldType == typeof(string))
+                        {
+                            string newValue = EditorGUILayout.TextField((string)value, GUILayout.Width(60));
+                            fieldInfo.SetValue(scriptComponents[i], newValue);
+                        }
 
 
-                    GUILayout.EndHorizontal();
+                        GUILayout.EndHorizontal();
 
-                    if (newVisibility)
-                    {
-                        string toggleKey = $"{scriptComponents[i].GetType().Name}_{fieldInfo.Name}";
-                        UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldInfo.GetValue(scriptComponents[i]), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
-                        toggleValues[toggleKey] = newVisibility;
+                        if (newVisibility)
+                        {
+                            string toggleKey = $"{scriptComponents[i].GetType().Name}_{fieldInfo.Name}";
+                            UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldInfo.GetValue(scriptComponents[i]), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
+                            toggleValues[toggleKey] = newVisibility;
+                        }
                     }
                 }
             }
         }
     }
 
+    private string GetFoldoutKey(MonoBehaviour scriptComponent)
+{
+    // gameObject kimliðini de kullanarak bir anahtar oluþtur
+    return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{currentGameObjectKey}_Foldout";
+}
 
     private void ScriptleriTara()
     {
