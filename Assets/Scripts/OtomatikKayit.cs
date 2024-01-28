@@ -21,6 +21,8 @@ public class CombinedManagerWindow : EditorWindow
     private string currentGameObjectKey = "";
     private List<GameObject> draggedGameObjectsList = new List<GameObject>();
     private bool foldout = true;
+    private List<ObjectData> objectDataList = new List<ObjectData>();
+    private Dictionary<GameObject, Dictionary<string, bool>> objectToggleStates = new Dictionary<GameObject, Dictionary<string, bool>>();
 
 
     [MenuItem("Window/Özel Editör Penceresi")]
@@ -67,7 +69,8 @@ public class CombinedManagerWindow : EditorWindow
 
     private void OnDestroy()
     {
-        SaveToJson();
+        //SaveToJson();
+        SaveAllObjectsToJson();
         OnValueChanged -= HandleValueChanged;
         Debug.Log("CombinedManagerWindow destroy metodu çaðrýldý");
     }
@@ -120,7 +123,8 @@ public class CombinedManagerWindow : EditorWindow
 
         if (draggedGameObject != null)
         {
-            SaveToJson();
+            //SaveToJson();
+            SaveAllObjectsToJson();
             GUILayout.BeginHorizontal();
 
             EditorGUILayout.ObjectField(draggedGameObject, typeof(GameObject), false);
@@ -261,16 +265,23 @@ public class CombinedManagerWindow : EditorWindow
     }
 
     private string GetFoldoutKey(MonoBehaviour scriptComponent)
-{
-    // gameObject kimliðini de kullanarak bir anahtar oluþtur
-    return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{currentGameObjectKey}_Foldout";
-}
+    {
+        // gameObject kimliðini de kullanarak bir anahtar oluþtur
+        return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{currentGameObjectKey}_Foldout";
+    }
 
     private void ScriptleriTara()
     {
         if (draggedGameObject != null)
         {
+            Debug.Log("Scriptleri taranýyor...");
+
+            // Scriptleri temizle, her seferinde yeni bir sürüklenen objeyi iþleyeceðiz
             scriptComponents.Clear();
+            toggleValues.Clear();
+            objectDataList.Clear();
+
+            // Sürüklenen objenin bileþenlerini al
             MonoBehaviour[] scripts = draggedGameObject.GetComponents<MonoBehaviour>();
 
             foreach (var script in scripts)
@@ -298,7 +309,18 @@ public class CombinedManagerWindow : EditorWindow
                         {
                             for (int i = 0; i < list.Count; i++)
                             {
-                                //Debug.Log($"- {fieldInfo.Name}[{i}]: {list[i] ?? "null"}");
+                                Debug.Log($"- {fieldInfo.Name}[{i}]: {list[i] ?? "null"}");
+
+                                // Her bir elemaný objectDataList'e ekle
+                                ObjectData objectData = new ObjectData();
+                                objectData.ObjectName = draggedGameObject.name; // veya baþka bir tanýmlayýcý kullanýlabilir
+                                objectData.ToggleValues[toggleKey] = toggleValues[toggleKey];
+
+                                // Alt deðeri eklemek için gerekli düzenlemeler yapýlabilir
+                                // Örnek olarak:
+                                objectData.FieldValues[$"{fieldInfo.Name}[{i}]"] = list[i];
+
+                                objectDataList.Add(objectData);
                             }
                         }
                     }
@@ -306,12 +328,24 @@ public class CombinedManagerWindow : EditorWindow
                     {
                         // Diðer türler için normal deðeri yazdýr
                         object value = fieldInfo.GetValue(script);
-                        //Debug.Log($"- {fieldInfo.Name}: {value ?? "null"}");
+                        Debug.Log($"- {fieldInfo.Name}: {value ?? "null"}");
+
+                        // Her bir deðeri objectDataList'e ekle
+                        ObjectData objectData = new ObjectData();
+                        objectData.ObjectName = draggedGameObject.name; // veya baþka bir tanýmlayýcý kullanýlabilir
+                        objectData.ToggleValues[toggleKey] = toggleValues[toggleKey];
+                        objectData.FieldValues[fieldInfo.Name] = value;
+
+                        objectDataList.Add(objectData);
                     }
                 }
             }
         }
+
+        // Debug çýktýsý: objectDataList içeriði
+        Debug.Log($"objectDataList Ýçeriði: {JsonUtility.ToJson(objectDataList, true)}");
     }
+
 
 
     private void SetPropertyVisibility(MonoBehaviour scriptComponent, string propertyName, bool visibility)
@@ -329,6 +363,13 @@ public class CombinedManagerWindow : EditorWindow
     private string GetVisibilityKey(MonoBehaviour scriptComponent, string propertyName)
     {
         return $"{scriptComponent.GetType().FullName}_{scriptComponent.GetInstanceID()}_{propertyName}";
+    }
+    [Serializable]
+    public class ObjectData
+    {
+        public string ObjectName;
+        public Dictionary<string, bool> ToggleValues = new Dictionary<string, bool>();
+        public Dictionary<string, object> FieldValues = new Dictionary<string, object>();
     }
 
     // JSON verilerini serileþtirmek ve deserializasyon yapmak için kullanýlacak sýnýf
@@ -369,7 +410,7 @@ public class CombinedManagerWindow : EditorWindow
             );
             jsonValues.Add(existingEntry);
         }
-
+        ScriptleriTara();
         // componentName'a ait önceki öðe varsa, deðeri güncelle
         existingEntry.Value[propertyName] = value;
 
@@ -408,7 +449,8 @@ public class CombinedManagerWindow : EditorWindow
         }
 
         // SaveToJson fonksiyonunu çaðýr
-        SaveToJson();
+        //SaveToJson();
+        SaveAllObjectsToJson();
     }
 
 
@@ -451,6 +493,73 @@ public class CombinedManagerWindow : EditorWindow
         }
 
     }
+
+    private void SaveAllObjectsToJson()
+    {
+        try
+        {
+            List<JsonEntry> allObjectsData = new List<JsonEntry>();
+
+            foreach (var objectData in objectDataList)
+            {
+                JsonEntry entry = new JsonEntry();
+                entry.Key = objectData.ObjectName;
+                entry.Values = objectData.FieldValues;
+                allObjectsData.Add(entry);
+            }
+
+            // Kontrol için log mesajý: objectDataList'in içeriðini göster
+            //Debug.Log($"objectDataList Ýçeriði: {JsonUtility.ToJson(objectDataList, true)}");
+
+            // Her bir sürüklenen obje için iþlemleri gerçekleþtir
+            foreach (var draggedObject in draggedGameObjectsList)
+            {
+                // Sürüklenen objenin adýný ve toggle durumlarýný al
+                string objectName = draggedObject.name;
+                Dictionary<string, bool> toggleStates;
+
+                if (objectToggleStates.TryGetValue(draggedObject, out toggleStates))
+                {
+                    // entry oluþtur
+                    JsonEntry entry = new JsonEntry();
+                    entry.Key = objectName;
+                    entry.Values = new Dictionary<string, object>();
+
+                    // Toggle durumlarýný ekle
+                    foreach (var toggleState in toggleStates)
+                    {
+                        entry.Values[toggleState.Key] = toggleState.Value;
+                    }
+
+                    allObjectsData.Add(entry);
+                }
+            }
+
+            string saveDataPath = "Assets/Resources/saveData/savedData.json";
+            _serializableData._jsonValues = allObjectsData
+                .SelectMany(entry =>
+                    entry.Values.Select(kv => new JsonData
+                    {
+                        key = $"{entry.Key}_{kv.Key}",
+                        componentName = entry.Key,
+                        propertyName = kv.Key,
+                        originalType = GetOriginalTypeString(kv.Value), // Toggle'lar bool olduðu için sabit olarak "bool" ekledik
+                        value = ConvertToString(kv.Value)
+                    }))
+                .ToList();
+
+            string json = JsonUtility.ToJson(_serializableData, true);
+            File.WriteAllText(saveDataPath, json);
+
+            //Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {saveDataPath}");
+        }
+        catch (Exception e)
+        {
+            //Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
+        }
+    }
+
+
 
 
 

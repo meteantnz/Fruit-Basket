@@ -5,7 +5,21 @@
             "componentName": "GameUI",
             "propertyName": "scoreValue",
             "originalType": "System.Int32",
-            "value": "300"
+            "value": "20"
+        },
+        {
+            "key": "GameUI__score",
+            "componentName": "GameUI",
+            "propertyName": "_score",
+            "originalType": "TMPro.TextMeshProUGUI",
+            "value": "Score Value (TMPro.TextMeshProUGUI)"
+        },
+        {
+            "key": "GameUI_scoreSlider",
+            "componentName": "GameUI",
+            "propertyName": "scoreSlider",
+            "originalType": "UnityEngine.UI.Slider",
+            "value": "Slider (UnityEngine.UI.Slider)"
         }
     ]
 }
