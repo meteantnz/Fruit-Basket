@@ -22,7 +22,6 @@ public class CombinedManagerWindow : EditorWindow
     private List<GameObject> draggedGameObjectsList = new List<GameObject>();
     private bool foldout = true;
     private List<ObjectData> objectDataList = new List<ObjectData>();
-    private Dictionary<GameObject, Dictionary<string, bool>> objectToggleStates = new Dictionary<GameObject, Dictionary<string, bool>>();
 
 
     [MenuItem("Window/Özel Editör Penceresi")]
@@ -120,6 +119,7 @@ public class CombinedManagerWindow : EditorWindow
                 Event.current.Use();
                 break;
         }
+
 
         if (draggedGameObject != null)
         {
@@ -245,7 +245,79 @@ public class CombinedManagerWindow : EditorWindow
                     draggedGameObjectsList.Add(draggedGameObject);
                     Repaint();
                 }
+
             }
+        }
+        if (draggedGameObjectsList.Count > 0)
+        {
+            GUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.LabelField("Sürüklenen Game Object'ler");
+
+            foreach (var obj in draggedGameObjectsList)
+            {
+                GUILayout.BeginVertical(EditorStyles.helpBox);
+
+                EditorGUILayout.LabelField($"Game Object: {obj.name}");
+
+                foreach (var component in obj.GetComponents<MonoBehaviour>())
+                {
+                    GUILayout.BeginVertical(EditorStyles.helpBox);
+
+                    EditorGUILayout.LabelField($"Component: {component.GetType().Name}");
+
+                    System.Reflection.FieldInfo[] fields = component.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                    foreach (var fieldInfo in fields)
+                    {
+                        GUILayout.BeginHorizontal();
+
+                        bool showProperty = GetPropertyVisibility(component, fieldInfo.Name);
+                        bool newVisibility = EditorGUILayout.ToggleLeft(fieldInfo.Name, showProperty, GUILayout.Width(120));
+
+                        if (newVisibility != showProperty)
+                        {
+                            SetPropertyVisibility(component, fieldInfo.Name, newVisibility);
+                        }
+
+                        object value = fieldInfo.GetValue(component);
+                        Type fieldType = fieldInfo.FieldType;
+
+                        GUILayout.Label(":", GUILayout.Width(5));
+
+                        if (fieldType == typeof(int))
+                        {
+                            int newValue = EditorGUILayout.IntField((int)value, GUILayout.Width(60));
+                            fieldInfo.SetValue(component, newValue);
+                        }
+                        else if (fieldType == typeof(float))
+                        {
+                            float newValue = EditorGUILayout.FloatField((float)value, GUILayout.Width(60));
+                            fieldInfo.SetValue(component, newValue);
+                        }
+                        else if (fieldType == typeof(string))
+                        {
+                            string newValue = EditorGUILayout.TextField((string)value, GUILayout.Width(60));
+                            fieldInfo.SetValue(component, newValue);
+                        }
+
+                        GUILayout.EndHorizontal();
+
+                        if (newVisibility)
+                        {
+                            string toggleKey = $"{component.GetType().Name}_{fieldInfo.Name}";
+                            UpdateJsonValue(component.GetType().Name, fieldInfo.Name, fieldInfo.GetValue(component), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
+                            toggleValues[toggleKey] = newVisibility;
+                        }
+                    }
+
+                    GUILayout.EndVertical();
+                }
+
+                GUILayout.EndVertical();
+            }
+
+            GUILayout.EndVertical();
         }
     }
 
@@ -276,73 +348,54 @@ public class CombinedManagerWindow : EditorWindow
         {
             Debug.Log("Scriptleri taranýyor...");
 
-            // Scriptleri temizle, her seferinde yeni bir sürüklenen objeyi iþleyeceðiz
             scriptComponents.Clear();
             toggleValues.Clear();
             objectDataList.Clear();
 
-            // Sürüklenen objenin bileþenlerini al
             MonoBehaviour[] scripts = draggedGameObject.GetComponents<MonoBehaviour>();
 
             foreach (var script in scripts)
             {
                 scriptComponents.Add(script);
 
-                // Toggle'ý varsayýlan olarak false olarak ayarla
                 string toggleKey = $"{script.GetType().Name}_";
                 toggleValues[toggleKey] = false;
 
-                // Debug mesajlarý ekle
                 Debug.Log($"Oyun Öncesi - ScriptleriTara Metodu - Script Component: {script.GetType().Name}");
 
-                // Script component'in public alan deðerlerini yazdýr
-                System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                ComponentData componentData = new ComponentData();
+                componentData.ComponentName = script.GetType().Name;
+
+                System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
                 foreach (var fieldInfo in fields)
                 {
-                    // Özel durum: Eðer alanýn türü List ise, listenin elemanlarýný yazdýr
-                    if (fieldInfo.FieldType.IsGenericType && fieldInfo.FieldType.GetGenericTypeDefinition() == typeof(List<>))
+                    bool showProperty = GetPropertyVisibility(script, fieldInfo.Name);
+
+                    object value = fieldInfo.GetValue(script);
+                    Type fieldType = fieldInfo.FieldType;
+
+                    if (showProperty)
                     {
-                        IList list = fieldInfo.GetValue(script) as IList;
+                        string toggleKeyForField = $"{script.GetType().Name}_{fieldInfo.Name}";
+                        toggleValues[toggleKeyForField] = false;
 
-                        if (list != null)
-                        {
-                            for (int i = 0; i < list.Count; i++)
-                            {
-                                Debug.Log($"- {fieldInfo.Name}[{i}]: {list[i] ?? "null"}");
-
-                                // Her bir elemaný objectDataList'e ekle
-                                ObjectData objectData = new ObjectData();
-                                objectData.ObjectName = draggedGameObject.name; // veya baþka bir tanýmlayýcý kullanýlabilir
-                                objectData.ToggleValues[toggleKey] = toggleValues[toggleKey];
-
-                                // Alt deðeri eklemek için gerekli düzenlemeler yapýlabilir
-                                // Örnek olarak:
-                                objectData.FieldValues[$"{fieldInfo.Name}[{i}]"] = list[i];
-
-                                objectDataList.Add(objectData);
-                            }
-                        }
+                        // Eklenen toggle'larý göster
+                        Debug.Log($"Toggle: {toggleKeyForField}, Value: {toggleValues[toggleKeyForField]}");
                     }
-                    else
-                    {
-                        // Diðer türler için normal deðeri yazdýr
-                        object value = fieldInfo.GetValue(script);
-                        Debug.Log($"- {fieldInfo.Name}: {value ?? "null"}");
 
-                        // Her bir deðeri objectDataList'e ekle
-                        ObjectData objectData = new ObjectData();
-                        objectData.ObjectName = draggedGameObject.name; // veya baþka bir tanýmlayýcý kullanýlabilir
-                        objectData.ToggleValues[toggleKey] = toggleValues[toggleKey];
-                        objectData.FieldValues[fieldInfo.Name] = value;
-
-                        objectDataList.Add(objectData);
-                    }
+                    componentData.FieldValues[fieldInfo.Name] = new FieldData { Value = value, ToggleKey = $"{script.GetType().Name}_{fieldInfo.Name}" };
                 }
+
+                ObjectData objectData = new ObjectData();
+                objectData.ObjectName = draggedGameObject.name;
+                objectData.ToggleValues[toggleKey] = toggleValues[toggleKey];
+                objectData.ComponentDataList.Add(componentData);
+
+                objectDataList.Add(objectData);
             }
         }
 
-        // Debug çýktýsý: objectDataList içeriði
         Debug.Log($"objectDataList Ýçeriði: {JsonUtility.ToJson(objectDataList, true)}");
     }
 
@@ -368,8 +421,24 @@ public class CombinedManagerWindow : EditorWindow
     public class ObjectData
     {
         public string ObjectName;
+        public bool Toggle;
         public Dictionary<string, bool> ToggleValues = new Dictionary<string, bool>();
+        public List<ComponentData> ComponentDataList = new List<ComponentData>();
+    }
+
+    [Serializable]
+    public class ComponentData
+    {
+        public string ComponentName;
         public Dictionary<string, object> FieldValues = new Dictionary<string, object>();
+    }
+
+    [Serializable]
+    public class FieldData
+    {
+        public object Value;
+        public string ToggleKey;
+        public bool Toggle;
     }
 
     // JSON verilerini serileþtirmek ve deserializasyon yapmak için kullanýlacak sýnýf
@@ -381,6 +450,7 @@ public class CombinedManagerWindow : EditorWindow
         public string propertyName;
         public string originalType; // Yeni eklenen alan: orijinal veri tipini saklar
         public string value;
+        public bool toggleState;
     }
 
 
@@ -410,7 +480,7 @@ public class CombinedManagerWindow : EditorWindow
             );
             jsonValues.Add(existingEntry);
         }
-        ScriptleriTara();
+
         // componentName'a ait önceki öðe varsa, deðeri güncelle
         existingEntry.Value[propertyName] = value;
 
@@ -423,7 +493,8 @@ public class CombinedManagerWindow : EditorWindow
                 componentName = entry.Key,
                 propertyName = kv.Key,
                 originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
-                value = ConvertToString(kv.Value) // Deðerleri stringe dönüþtür
+                value = ConvertToString(kv.Value), // Deðerleri stringe dönüþtür
+               // toggleState = GetToggleState(entry.Key, kv.Key) // Toggle durumu
             });
         }).ToList();
 
@@ -445,12 +516,18 @@ public class CombinedManagerWindow : EditorWindow
         // Debug çýktýsý ekle
         foreach (var jsonData in jsonDataList)
         {
-            //Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
+            Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}, ToggleState: {jsonData.toggleState}");
         }
 
         // SaveToJson fonksiyonunu çaðýr
         //SaveToJson();
         SaveAllObjectsToJson();
+    }
+
+    private bool GetToggleState(string componentName, string propertyName)
+    {
+        string toggleKey = $"{componentName}_{propertyName}";
+        return toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey];
     }
 
 
@@ -500,65 +577,70 @@ public class CombinedManagerWindow : EditorWindow
         {
             List<JsonEntry> allObjectsData = new List<JsonEntry>();
 
-            foreach (var objectData in objectDataList)
-            {
-                JsonEntry entry = new JsonEntry();
-                entry.Key = objectData.ObjectName;
-                entry.Values = objectData.FieldValues;
-                allObjectsData.Add(entry);
-            }
-
-            // Kontrol için log mesajý: objectDataList'in içeriðini göster
-            //Debug.Log($"objectDataList Ýçeriði: {JsonUtility.ToJson(objectDataList, true)}");
-
-            // Her bir sürüklenen obje için iþlemleri gerçekleþtir
             foreach (var draggedObject in draggedGameObjectsList)
             {
-                // Sürüklenen objenin adýný ve toggle durumlarýný al
-                string objectName = draggedObject.name;
-                Dictionary<string, bool> toggleStates;
+                JsonEntry entry = new JsonEntry();
+                entry.Key = draggedObject.name;
+                entry.Values = new Dictionary<string, object>();
 
-                if (objectToggleStates.TryGetValue(draggedObject, out toggleStates))
+                // Sürüklenen objenin üzerindeki bileþenlerin deðerlerini ekleyin
+                MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+
+                foreach (var script in scripts)
                 {
-                    // entry oluþtur
-                    JsonEntry entry = new JsonEntry();
-                    entry.Key = objectName;
-                    entry.Values = new Dictionary<string, object>();
+                    string componentName = script.GetType().Name;
+                    entry.Values[componentName] = new Dictionary<string, object>();
 
-                    // Toggle durumlarýný ekle
-                    foreach (var toggleState in toggleStates)
+                    System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                    foreach (var fieldInfo in fields)
                     {
-                        entry.Values[toggleState.Key] = toggleState.Value;
-                    }
+                        // Yalnýzca toggle durumu true olanlarý kaydet
+                        string toggleKey = $"{componentName}_{fieldInfo.Name}";
+                        if (toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey])
+                        {
+                            object value = fieldInfo.GetValue(script);
+                            string fieldName = fieldInfo.Name;
 
-                    allObjectsData.Add(entry);
+                            // Burada entry'nin tipini JsonEntry olarak belirtiyoruz
+                            ((Dictionary<string, object>)entry.Values[componentName])[fieldName] = value;
+                        }
+                    }
                 }
+
+                allObjectsData.Add(entry);
             }
 
             string saveDataPath = "Assets/Resources/saveData/savedData.json";
             _serializableData._jsonValues = allObjectsData
                 .SelectMany(entry =>
-                    entry.Values.Select(kv => new JsonData
+                    entry.Values.SelectMany(component =>
                     {
-                        key = $"{entry.Key}_{kv.Key}",
-                        componentName = entry.Key,
-                        propertyName = kv.Key,
-                        originalType = GetOriginalTypeString(kv.Value), // Toggle'lar bool olduðu için sabit olarak "bool" ekledik
-                        value = ConvertToString(kv.Value)
-                    }))
+                        // Burada component.Value'ýn tipini belirtiyoruz
+                        Dictionary<string, object> componentValues = (Dictionary<string, object>)component.Value;
+
+                        return componentValues.Select(kv => new JsonData
+                        {
+                            key = $"{entry.Key}_{component.Key}_{kv.Key}",
+                            componentName = component.Key,
+                            propertyName = kv.Key,
+                            originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
+                            value = ConvertToString(kv.Value)
+                        });
+                    })
+                )
                 .ToList();
 
             string json = JsonUtility.ToJson(_serializableData, true);
             File.WriteAllText(saveDataPath, json);
 
-            //Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {saveDataPath}");
+            Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {saveDataPath}");
         }
         catch (Exception e)
         {
-            //Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
+            Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
         }
     }
-
 
 
 
