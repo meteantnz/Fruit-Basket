@@ -22,6 +22,8 @@ public class CombinedManagerWindow : EditorWindow
     private List<GameObject> draggedGameObjectsList = new List<GameObject>();
     private bool foldout = true;
     private List<ObjectData> objectDataList = new List<ObjectData>();
+    private bool updateJsonValueFlag = false;
+    private Dictionary<string, Dictionary<string, object>> previousValuesDict = new Dictionary<string, Dictionary<string, object>>();
 
 
     [MenuItem("Window/Özel Editör Penceresi")]
@@ -77,11 +79,13 @@ public class CombinedManagerWindow : EditorWindow
     private void Update()
     {
         // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýrmak için kontrol
+        bool changesDetectedList = CheckForAnyComponentChanges();
         bool changesDetected = CheckForChanges();
 
-        if (changesDetected)
+        if (changesDetectedList || changesDetected)
         {
-            // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýr
+            updateJsonValueFlag = true;
+            SaveAllObjectsToJson();
             Repaint();
         }
 
@@ -112,6 +116,7 @@ public class CombinedManagerWindow : EditorWindow
                         draggedGameObject = draggedObj as GameObject;
                         ScriptleriTara();
                         Repaint();
+                        updateJsonValueFlag = true;
                     }
                     Debug.Log("GameObject sürüklendi ve iþlendi");
                 }
@@ -200,8 +205,14 @@ public class CombinedManagerWindow : EditorWindow
                         if (newVisibility)
                         {
                             string toggleKey = $"{scriptComponents[i].GetType().Name}_{fieldInfo.Name}";
-                            UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldInfo.GetValue(scriptComponents[i]), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
                             toggleValues[toggleKey] = newVisibility;
+
+                            if (updateJsonValueFlag)
+                            {
+                                UpdateJsonValue(scriptComponents[i].GetType().Name, fieldInfo.Name, fieldInfo.GetValue(scriptComponents[i]), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
+                                updateJsonValueFlag = false;
+                                Debug.Log("dspfgjdpsgjdsfg");
+                            }
                         }
                     }
                 }
@@ -306,8 +317,15 @@ public class CombinedManagerWindow : EditorWindow
                         if (newVisibility)
                         {
                             string toggleKey = $"{component.GetType().Name}_{fieldInfo.Name}";
-                            UpdateJsonValue(component.GetType().Name, fieldInfo.Name, fieldInfo.GetValue(component), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
+                            
                             toggleValues[toggleKey] = newVisibility;
+
+                            if (updateJsonValueFlag)
+                            {
+                                UpdateJsonValue(component.GetType().Name, fieldInfo.Name, fieldInfo.GetValue(component), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
+                                updateJsonValueFlag = false;
+                            }
+
                         }
                     }
 
@@ -450,7 +468,6 @@ public class CombinedManagerWindow : EditorWindow
         public string propertyName;
         public string originalType; // Yeni eklenen alan: orijinal veri tipini saklar
         public string value;
-        public bool toggleState;
     }
 
 
@@ -492,11 +509,11 @@ public class CombinedManagerWindow : EditorWindow
                 key = $"{entry.Key}_{kv.Key}",
                 componentName = entry.Key,
                 propertyName = kv.Key,
-                originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
-                value = ConvertToString(kv.Value), // Deðerleri stringe dönüþtür
-               // toggleState = GetToggleState(entry.Key, kv.Key) // Toggle durumu
+                originalType = GetOriginalTypeString(kv.Value),
+                value = ConvertToString(kv.Value),
             });
         }).ToList();
+
 
         // jsonValues listesini güncelleyin
         jsonValues = jsonDataList.GroupBy(jd => jd.componentName)
@@ -516,7 +533,7 @@ public class CombinedManagerWindow : EditorWindow
         // Debug çýktýsý ekle
         foreach (var jsonData in jsonDataList)
         {
-            Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}, ToggleState: {jsonData.toggleState}");
+            Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
         }
 
         // SaveToJson fonksiyonunu çaðýr
@@ -818,13 +835,27 @@ public class CombinedManagerWindow : EditorWindow
             }
         }
 
+        // Yalnýzca alt deðerlerde deðiþiklik olduðunda Repaint fonksiyonunu çaðýr
+        if (changesDetected)
+        {
+            Repaint();
+        }
+
         return changesDetected;
     }
 
     private bool CheckForChanges(MonoBehaviour script)
     {
-        Dictionary<string, object> previousValues = previousComponentValues[script];
         bool changesDetected = false;
+
+        // previousComponentValues içinde script anahtarýnýn olup olmadýðýný kontrol et
+        if (!previousComponentValues.ContainsKey(script))
+        {
+            // Eðer anahtar yoksa, yeni bir Dictionary oluþtur
+            previousComponentValues[script] = new Dictionary<string, object>();
+        }
+
+        Dictionary<string, object> previousValues = previousComponentValues[script];
 
         System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
@@ -859,6 +890,25 @@ public class CombinedManagerWindow : EditorWindow
         return changesDetected;
     }
 
+    private bool CheckForAnyComponentChanges()
+{
+    foreach (var draggedObject in draggedGameObjectsList)
+    {
+        MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+
+        foreach (var script in scripts)
+        {
+            // Deðiþiklik kontrolü
+            if (CheckForChanges(script))
+            {
+                return true; // Herhangi bir deðiþiklik bulunduðunda true döndür
+            }
+        }
+    }
+
+    return false; // Hiçbir deðiþiklik bulunamadýðýnda false döndür
+}
+
     private MonoBehaviour FindScriptComponent(string componentName)
     {
         if (draggedGameObject != null)
@@ -889,6 +939,25 @@ public class CombinedManagerWindow : EditorWindow
             if (fieldInfo != null)
             {
                 fieldInfo.SetValue(script, newValue);
+            }
+        }
+
+        // draggedGameObjectsList içindeki her objenin bileþenlerini güncelle
+        foreach (var draggedObject in draggedGameObjectsList)
+        {
+            MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+
+            foreach (MonoBehaviour innerScript in scripts)
+            {
+                if (innerScript.GetType().Name == componentName)
+                {
+                    System.Reflection.FieldInfo fieldInfo = innerScript.GetType().GetField(propertyName);
+                    if (fieldInfo != null)
+                    {
+                        fieldInfo.SetValue(innerScript, newValue);
+                        
+                    }
+                }
             }
         }
     }
