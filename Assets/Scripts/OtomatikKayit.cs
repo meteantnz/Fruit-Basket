@@ -58,6 +58,7 @@ public class CombinedManagerWindow : EditorWindow
             string key = GetFoldoutKey(scriptComponent);
             EditorPrefs.SetBool(key, scriptFoldouts[scriptComponent.GetType().Name]);
         }
+        SaveToJson();
 
         Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
@@ -70,8 +71,7 @@ public class CombinedManagerWindow : EditorWindow
 
     private void OnDestroy()
     {
-        //SaveToJson();
-        SaveAllObjectsToJson();
+        SaveToJson();
         OnValueChanged -= HandleValueChanged;
         Debug.Log("CombinedManagerWindow destroy metodu çaðrýldý");
     }
@@ -85,7 +85,7 @@ public class CombinedManagerWindow : EditorWindow
         if (changesDetectedList || changesDetected)
         {
             updateJsonValueFlag = true;
-            SaveAllObjectsToJson();
+            SaveToJson();
             Repaint();
         }
 
@@ -128,8 +128,7 @@ public class CombinedManagerWindow : EditorWindow
 
         if (draggedGameObject != null)
         {
-            //SaveToJson();
-            SaveAllObjectsToJson();
+            SaveToJson();
             GUILayout.BeginHorizontal();
 
             EditorGUILayout.ObjectField(draggedGameObject, typeof(GameObject), false);
@@ -317,7 +316,7 @@ public class CombinedManagerWindow : EditorWindow
                         if (newVisibility)
                         {
                             string toggleKey = $"{component.GetType().Name}_{fieldInfo.Name}";
-                            
+
                             toggleValues[toggleKey] = newVisibility;
 
                             if (updateJsonValueFlag)
@@ -536,9 +535,7 @@ public class CombinedManagerWindow : EditorWindow
             Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
         }
 
-        // SaveToJson fonksiyonunu çaðýr
-        //SaveToJson();
-        SaveAllObjectsToJson();
+        SaveToJson();
     }
 
     private bool GetToggleState(string componentName, string propertyName)
@@ -549,7 +546,7 @@ public class CombinedManagerWindow : EditorWindow
 
 
 
-    private void SaveToJson()
+    private void SaveToJsonn()
     {
 
         try
@@ -588,52 +585,61 @@ public class CombinedManagerWindow : EditorWindow
 
     }
 
-    private void SaveAllObjectsToJson()
+    private void SaveToJson()
     {
         try
         {
-            List<JsonEntry> allObjectsData = new List<JsonEntry>();
+            // Deðiþen verileri kontrol et
+            bool changesDetected = CheckForAnyComponentChanges();
 
-            foreach (var draggedObject in draggedGameObjectsList)
+            if (changesDetected)
             {
-                JsonEntry entry = new JsonEntry();
-                entry.Key = draggedObject.name;
-                entry.Values = new Dictionary<string, object>();
+                // Güncel deðerleri saklamak için bir sözlük oluþtur
+                Dictionary<GameObject, Dictionary<string, object>> updatedValues = new Dictionary<GameObject, Dictionary<string, object>>();
 
-                // Sürüklenen objenin üzerindeki bileþenlerin deðerlerini ekleyin
-                MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+                // Deðiþen verileri kaydet
+                _serializableData._jsonValues = new List<JsonData>();
 
-                foreach (var script in scripts)
+                foreach (var draggedObject in draggedGameObjectsList)
                 {
-                    string componentName = script.GetType().Name;
-                    entry.Values[componentName] = new Dictionary<string, object>();
+                    // Güncel deðerleri saklamak için bir sözlük oluþtur
+                    Dictionary<string, object> updatedObjectValues = new Dictionary<string, object>();
 
-                    System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    JsonEntry entry = new JsonEntry();
+                    entry.Key = draggedObject.name;
+                    entry.Values = new Dictionary<string, object>();
 
-                    foreach (var fieldInfo in fields)
+                    MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+
+                    foreach (var script in scripts)
                     {
-                        // Yalnýzca toggle durumu true olanlarý kaydet
-                        string toggleKey = $"{componentName}_{fieldInfo.Name}";
-                        if (toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey])
-                        {
-                            object value = fieldInfo.GetValue(script);
-                            string fieldName = fieldInfo.Name;
+                        string componentName = script.GetType().Name;
+                        entry.Values[componentName] = new Dictionary<string, object>();
 
-                            // Burada entry'nin tipini JsonEntry olarak belirtiyoruz
-                            ((Dictionary<string, object>)entry.Values[componentName])[fieldName] = value;
+                        System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                        foreach (var fieldInfo in fields)
+                        {
+                            // Yalnýzca toggle durumu true olanlarý kaydet
+                            string toggleKey = $"{componentName}_{fieldInfo.Name}";
+                            if (toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey])
+                            {
+                                object value = fieldInfo.GetValue(script);
+                                string fieldName = fieldInfo.Name;
+
+                                // Güncel deðerleri sakla
+                                updatedObjectValues[fieldName] = value;
+
+                                ((Dictionary<string, object>)entry.Values[componentName])[fieldName] = value;
+                            }
                         }
                     }
-                }
 
-                allObjectsData.Add(entry);
-            }
+                    // Güncel deðerleri saklamak için koleksiyona ekle
+                    updatedValues[draggedObject] = updatedObjectValues;
 
-            string saveDataPath = "Assets/Resources/saveData/savedData.json";
-            _serializableData._jsonValues = allObjectsData
-                .SelectMany(entry =>
-                    entry.Values.SelectMany(component =>
+                    _serializableData._jsonValues.AddRange(entry.Values.SelectMany(component =>
                     {
-                        // Burada component.Value'ýn tipini belirtiyoruz
                         Dictionary<string, object> componentValues = (Dictionary<string, object>)component.Value;
 
                         return componentValues.Select(kv => new JsonData
@@ -641,23 +647,43 @@ public class CombinedManagerWindow : EditorWindow
                             key = $"{entry.Key}_{component.Key}_{kv.Key}",
                             componentName = component.Key,
                             propertyName = kv.Key,
-                            originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
+                            originalType = GetOriginalTypeString(kv.Value),
                             value = ConvertToString(kv.Value)
                         });
-                    })
-                )
-                .ToList();
+                    }));
+                }
 
-            string json = JsonUtility.ToJson(_serializableData, true);
-            File.WriteAllText(saveDataPath, json);
+                // JSON dosyasýna kaydet
+                string json = JsonUtility.ToJson(_serializableData, true);
+                File.WriteAllText(jsonFilePath, json);
 
-            Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {saveDataPath}");
+                Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {jsonFilePath}");
+
+                // Güncel deðerleri atama
+                foreach (var kvp in updatedValues)
+                {
+                    foreach (var fieldName in kvp.Value.Keys)
+                    {
+                        System.Reflection.FieldInfo fieldInfo = kvp.Key.GetType().GetField(fieldName);
+                        if (fieldInfo != null)
+                        {
+                            fieldInfo.SetValue(kvp.Key, kvp.Value[fieldName]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Debug.Log("Deðiþen veri bulunamadý. Kayýt yapýlmayacak.");
+            }
         }
         catch (Exception e)
         {
-            Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
+            Debug.LogError($"SaveToJson Hatasý: {e.Message}");
         }
     }
+
+
 
 
 
@@ -677,19 +703,8 @@ public class CombinedManagerWindow : EditorWindow
 
                 if (loadedData != null && loadedData._jsonValues != null)
                 {
-                    // Debug çýktýsý: JSON dosyasýndan yüklenen SerializableData içeriði
-                    //Debug.Log($"Yüklenen SerializableData: {JsonUtility.ToJson(loadedData, true)}");
-
-                    // _jsonValues listesini güncelle
                     _serializableData._jsonValues = loadedData._jsonValues.ToList();
 
-                    // Debug çýktýsý: _jsonValues listesi
-                    //Debug.Log($"_jsonValues Ýçeriði: {JsonUtility.ToJson(_serializableData._jsonValues, true)}");
-
-                    // Deðerleri ilgili deðiþkenlere atama iþlemini burada yapabilirsiniz
-                    // ...
-
-                    // Örneðin:
                     foreach (var jsonData in _serializableData._jsonValues)
                     {
                         MonoBehaviour script = FindScriptComponent(jsonData.componentName);
@@ -700,20 +715,11 @@ public class CombinedManagerWindow : EditorWindow
                             {
                                 object loadedValue = ConvertFromString(jsonData.originalType, jsonData.value);
                                 fieldInfo.SetValue(script, loadedValue);
-
-                                // Deðer deðiþikliðini tetikle
-
                             }
                         }
                     }
 
-                    // Debug çýktýsý: Yüklenen JSON deðerleri
-                    foreach (var jsonData in _serializableData._jsonValues)
-                    {
-                        //Debug.Log($"Anahtar: {jsonData.key}, Bileþen: {jsonData.componentName}, Özellik: {jsonData.propertyName}, Orijinal Tür: {jsonData.originalType}, Deðer: {jsonData.value}");
-                    }
-
-                    //Debug.Log("JSON dosyasý þuradan yüklendi: " + jsonFilePath);
+                    Debug.Log($"JSON dosyasý yüklendi: {jsonFilePath}");
                 }
                 else
                 {
@@ -838,7 +844,7 @@ public class CombinedManagerWindow : EditorWindow
         // Yalnýzca alt deðerlerde deðiþiklik olduðunda Repaint fonksiyonunu çaðýr
         if (changesDetected)
         {
-            Repaint();
+            Repaint();  
         }
 
         return changesDetected;
@@ -848,10 +854,8 @@ public class CombinedManagerWindow : EditorWindow
     {
         bool changesDetected = false;
 
-        // previousComponentValues içinde script anahtarýnýn olup olmadýðýný kontrol et
         if (!previousComponentValues.ContainsKey(script))
         {
-            // Eðer anahtar yoksa, yeni bir Dictionary oluþtur
             previousComponentValues[script] = new Dictionary<string, object>();
         }
 
@@ -864,25 +868,19 @@ public class CombinedManagerWindow : EditorWindow
             object currentValue = fieldInfo.GetValue(script);
             string fieldName = fieldInfo.Name;
 
-            // Önceki deðer var mý kontrol et
             if (previousValues.ContainsKey(fieldName))
             {
                 object previousValue = previousValues[fieldName];
 
-                // Farklýlýk var mý kontrol et
                 if (!UnityEngine.Object.Equals(currentValue, previousValue))
                 {
                     changesDetected = true;
-
-                    // Önceki deðeri güncelle
                     previousValues[fieldName] = currentValue;
-
-                    break;  // Farklýlýk bulunduðu için döngüyü sonlandýr
+                    break;
                 }
             }
             else
             {
-                // Önceki deðeri güncelle
                 previousValues[fieldName] = currentValue;
             }
         }
@@ -891,23 +889,30 @@ public class CombinedManagerWindow : EditorWindow
     }
 
     private bool CheckForAnyComponentChanges()
-{
-    foreach (var draggedObject in draggedGameObjectsList)
     {
-        MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+        bool changesDetected = false;
 
-        foreach (var script in scripts)
+        foreach (var draggedObject in draggedGameObjectsList)
         {
-            // Deðiþiklik kontrolü
-            if (CheckForChanges(script))
+            MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
+
+            foreach (var script in scripts)
             {
-                return true; // Herhangi bir deðiþiklik bulunduðunda true döndür
+                if (CheckForChanges(script))
+                {
+                    changesDetected = true;
+                    break;
+                }
+            }
+
+            if (changesDetected)
+            {
+                break;
             }
         }
-    }
 
-    return false; // Hiçbir deðiþiklik bulunamadýðýnda false döndür
-}
+        return changesDetected;
+    }
 
     private MonoBehaviour FindScriptComponent(string componentName)
     {
@@ -919,30 +924,16 @@ public class CombinedManagerWindow : EditorWindow
             {
                 if (script.GetType().Name == componentName)
                 {
-                    //Debug.Log($"Script component found for {componentName}: {script.GetType().Name}");
                     return script;
                 }
             }
         }
 
-        Debug.LogWarning($"Script component not found for {componentName}");
         return null;
     }
 
     private void HandleValueChanged(string componentName, string propertyName, object newValue)
     {
-        // Deðer deðiþikliðini burada iþleyin
-        MonoBehaviour script = FindScriptComponent(componentName);
-        if (script != null)
-        {
-            System.Reflection.FieldInfo fieldInfo = script.GetType().GetField(propertyName);
-            if (fieldInfo != null)
-            {
-                fieldInfo.SetValue(script, newValue);
-            }
-        }
-
-        // draggedGameObjectsList içindeki her objenin bileþenlerini güncelle
         foreach (var draggedObject in draggedGameObjectsList)
         {
             MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
@@ -955,10 +946,60 @@ public class CombinedManagerWindow : EditorWindow
                     if (fieldInfo != null)
                     {
                         fieldInfo.SetValue(innerScript, newValue);
-                        
                     }
                 }
             }
         }
     }
+
+    [InitializeOnLoad]
+    public class SaveDataOnPlayModeChange
+    {
+        static SaveDataOnPlayModeChange()
+        {
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode || state == PlayModeStateChange.ExitingPlayMode)
+            {
+                // Oyun duraklatýldýðýnda veya kapatýldýðýnda yapýlacak iþlemler
+                SaveData();
+            }
+        }
+        private static void SaveData()
+        {
+            CombinedManagerWindow combinedManagerWindow = GetCombinedManagerWindowInstance();
+            if (combinedManagerWindow != null)
+            {
+                combinedManagerWindow.SaveToJson();
+                Debug.Log("Oyun duraklatýldýðýnda veya kapatýldýðýnda veriler kaydedildi.");
+            }
+            else
+            {
+                Debug.LogError("CombinedManagerWindow örneði bulunamadý!");
+            }
+
+            // Oyun duraklatýldýðýnda veya kapatýldýðýnda kaydetme iþleminin gerçekleþtiðini kontrol etmek için bir debug mesajý ekleyelim
+            Debug.Log("Oyun duraklatýldýðýnda veya kapatýldýðýnda SaveData metodunun çaðrýldýðý kontrol edildi.");
+        }
+        private static CombinedManagerWindow GetCombinedManagerWindowInstance()
+        {
+            CombinedManagerWindow[] windows = Resources.FindObjectsOfTypeAll<CombinedManagerWindow>();
+            if (windows != null && windows.Length > 0)
+            {
+                // Mevcut pencereyi döndür
+                return windows[0];
+            }
+            else
+            {
+                Debug.LogWarning("CombinedManagerWindow örneði bulunamadý. Yeni bir örnek oluþturulacak.");
+                // Yeni bir örnek oluþtur ve döndür
+                return ScriptableObject.CreateInstance<CombinedManagerWindow>();
+            }
+        }
+    }
+    
 }
+
