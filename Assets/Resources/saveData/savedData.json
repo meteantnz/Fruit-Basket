@@ -1,3 +1,28 @@
 {
-    "_jsonValues": []
+    "_jsonValues": [
+        {
+            "key": "GameUI_GameUI_scoreValue",
+            "componentName": "GameUI",
+            "propertyName": "scoreValue",
+            "originalType": "System.Int32",
+            "value": "30",
+            "toggleState": true
+        },
+        {
+            "key": "FruitSpawnerControl_FruitSpawner_maxX",
+            "componentName": "FruitSpawner",
+            "propertyName": "maxX",
+            "originalType": "System.Single",
+            "value": "2.39",
+            "toggleState": true
+        },
+        {
+            "key": "FruitSpawnerControl_FruitSpawner_meyveIndex",
+            "componentName": "FruitSpawner",
+            "propertyName": "meyveIndex",
+            "originalType": "System.Int32",
+            "value": "0",
+            "toggleState": true
+        }
+    ]
 }

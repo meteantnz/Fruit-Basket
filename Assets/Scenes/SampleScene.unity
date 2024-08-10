@@ -862,7 +862,7 @@ MonoBehaviour:
   - prefab: {fileID: 1736412078436589887, guid: eb35f3921c72c874ca5a8dfdc8e54aad, type: 3}
     spawnProbability: 10
     score: 2
-  minX: -2.39
+  minX: 0
   maxX: 2.39
   ySpawnHeight: 7
   meyveAdeti: 20
@@ -1374,7 +1374,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d36580e6789b8b44492458a8eadd737d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scoreValue: 100
+  scoreValue: 30
   _score: {fileID: 694741776}
   scoreSlider: {fileID: 2134343460}
 --- !u!4 &1524386795

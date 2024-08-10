@@ -88,13 +88,13 @@ public class CombinedManagerWindow : EditorWindow
     private void Update()
     {
         // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýrmak için kontrol
-        bool changesDetected = CheckForChanges();
+        
 
-        if (changesDetected)
-        {
-            // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýr
-            Repaint();
-        }
+        //if (changesDetected)
+        //{
+        //    // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýr
+        //    Repaint();
+        //}
         // Geri kalan Update fonksiyonu içeriði...
     }
 
@@ -410,67 +410,34 @@ public class CombinedManagerWindow : EditorWindow
 
     public void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
-        // componentName ve propertyName'e ait önceki öðeyi bul
-        var existingEntry = jsonValues.Find(entry => entry.Key == componentName);
+        // Mevcut JSON verilerini güncelle
+        var jsonData = _serializableData._jsonValues
+            .FirstOrDefault(jd => jd.componentName == componentName && jd.propertyName == propertyName);
 
-        if (existingEntry.Equals(default(KeyValuePair<string, Dictionary<string, object>>)))
+        if (jsonData != null)
         {
-            // componentName'a ait önceki öðe yoksa, yeni bir öðe oluþtur
-            existingEntry = new KeyValuePair<string, Dictionary<string, object>>(
-                componentName,
-                new Dictionary<string, object>()
-            );
-            jsonValues.Add(existingEntry);
+            jsonData.value = ConvertToString(value);
+            jsonData.originalType = GetOriginalTypeString(value);
+            jsonData.toggleState = toggleState;
         }
-
-        // Deðeri güncelle
-        var oldValue = existingEntry.Value.ContainsKey(propertyName) ? existingEntry.Value[propertyName] : null;
-        if (!Equals(oldValue, value))
+        else
         {
-            existingEntry.Value[propertyName] = value;
-            _hasChanges = true; // Deðiþiklik tespit edildi
-        }
-
-        // _jsonValues listesini oluþturun
-        List<JsonData> jsonDataList = jsonValues.SelectMany(entry =>
-        {
-            return entry.Value.Select(kv => new JsonData
+            _serializableData._jsonValues.Add(new JsonData
             {
-                key = $"{entry.Key}_{kv.Key}",
-                componentName = entry.Key,
-                propertyName = kv.Key,
-                originalType = GetOriginalTypeString(kv.Value),
-                value = ConvertToString(kv.Value)
+                key = $"{componentName}_{propertyName}",
+                componentName = componentName,
+                propertyName = propertyName,
+                originalType = GetOriginalTypeString(value),
+                value = ConvertToString(value),
+                toggleState = toggleState
             });
-        }).ToList();
+        }
 
-        // jsonValues listesini güncelleyin
-        jsonValues = jsonDataList.GroupBy(jd => jd.componentName)
-            .ToDictionary(
-                group => group.Key,
-                group => group.ToDictionary(item => item.propertyName, item => ConvertFromString(item.originalType, item.value))
-            )
-            .Select(entry => new KeyValuePair<string, Dictionary<string, object>>(entry.Key, entry.Value))
-            .ToList();
-
-        // _serializableData._jsonValues'i güncelle
-        _serializableData._jsonValues = jsonDataList;
-
+        // Deðiþiklikleri kaydet
+        SaveAllObjectsToJson();
+        //LogSerializableData();
         // Olayý tetikle
         OnValueChanged?.Invoke(componentName, propertyName, value);
-
-        // Debug çýktýsý ekle
-        foreach (var jsonData in jsonDataList)
-        {
-            //Debug.Log($"Key: {jsonData.key}, Component: {jsonData.componentName}, Property: {jsonData.propertyName}, OriginalType: {jsonData.originalType}, Value: {jsonData.value}");
-        }
-
-        // Deðiþiklik varsa kaydet
-        if (_hasChanges)
-        {
-            SaveAllObjectsToJson();
-            _hasChanges = false; // Kaydetme sonrasý deðiþiklikleri sýfýrla
-        }
     }
 
     private bool GetToggleState(string componentName, string propertyName)
@@ -483,66 +450,11 @@ public class CombinedManagerWindow : EditorWindow
     {
         try
         {
-            List<JsonEntry> allObjectsData = new List<JsonEntry>();
-
-            foreach (var draggedObject in draggedGameObjectsList)
-            {
-                JsonEntry entry = new JsonEntry();
-                entry.Key = draggedObject.name;
-                entry.Values = new Dictionary<string, object>();
-
-                // Sürüklenen objenin üzerindeki bileþenlerin deðerlerini ekleyin
-                MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
-
-                foreach (var script in scripts)
-                {
-                    string componentName = script.GetType().Name;
-                    entry.Values[componentName] = new Dictionary<string, object>();
-
-                    System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                    foreach (var fieldInfo in fields)
-                    {
-                        // Yalnýzca toggle durumu true olanlarý kaydet
-                        string toggleKey = $"{componentName}_{fieldInfo.Name}";
-                        if (toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey])
-                        {
-                            object value = fieldInfo.GetValue(script);
-                            string fieldName = fieldInfo.Name;
-
-                            // Burada entry'nin tipini JsonEntry olarak belirtiyoruz
-                            ((Dictionary<string, object>)entry.Values[componentName])[fieldName] = value;
-                        }
-                    }
-                }
-
-                allObjectsData.Add(entry);
-            }
-
-            string saveDataPath = "Assets/Resources/saveData/savedData.json";
-            _serializableData._jsonValues = allObjectsData
-                .SelectMany(entry =>
-                    entry.Values.SelectMany(component =>
-                    {
-                        // Burada component.Value'ýn tipini belirtiyoruz
-                        Dictionary<string, object> componentValues = (Dictionary<string, object>)component.Value;
-
-                        return componentValues.Select(kv => new JsonData
-                        {
-                            key = $"{entry.Key}_{component.Key}_{kv.Key}",
-                            componentName = component.Key,
-                            propertyName = kv.Key,
-                            originalType = GetOriginalTypeString(kv.Value), // Orijinal türü string olarak sakla
-                            value = ConvertToString(kv.Value)
-                        });
-                    })
-                )
-                .ToList();
-
+            // JSON verilerini güncellenmiþ haliyle kaydet
             string json = JsonUtility.ToJson(_serializableData, true);
-            File.WriteAllText(saveDataPath, json);
-
-            Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {saveDataPath}");
+            File.WriteAllText("Assets/Resources/saveData/savedData.json", json);
+            Debug.Log($"Tüm alanlar JSON olarak kaydedildi: Assets/Resources/saveData/savedData.json");
+            Debug.Log($"json:{json}");
         }
         catch (Exception e)
         {
@@ -557,30 +469,17 @@ public class CombinedManagerWindow : EditorWindow
     {
         try
         {
-            if (Resources.Load<TextAsset>("saveData/savedData") != null)
+            string path = Application.persistentDataPath + "/saveData.json";
+            if (System.IO.File.Exists(path))
             {
-                TextAsset textAsset = Resources.Load<TextAsset>("saveData/savedData");
+                string json = System.IO.File.ReadAllText(path);
+                _serializableData = JsonUtility.FromJson<SerializableData>(json);
 
-                string json = textAsset.text;
+                // Verileri logla (opsiyonel)
+                LogSerializableData();
 
-                // JSON verilerini dosyadan okuma ve deserializasyon iþlemi
-                SerializableData loadedData = JsonUtility.FromJson<SerializableData>(json);
-
-                if (loadedData != null && loadedData._jsonValues != null)
+                if (_serializableData != null && _serializableData._jsonValues != null)
                 {
-                    // Debug çýktýsý: JSON dosyasýndan yüklenen SerializableData içeriði
-                    //Debug.Log($"Yüklenen SerializableData: {JsonUtility.ToJson(loadedData, true)}");
-
-                    // _jsonValues listesini güncelle
-                    _serializableData._jsonValues = loadedData._jsonValues.ToList();
-
-                    // Debug çýktýsý: _jsonValues listesi
-                    //Debug.Log($"_jsonValues Ýçeriði: {JsonUtility.ToJson(_serializableData._jsonValues, true)}");
-
-                    // Deðerleri ilgili deðiþkenlere atama iþlemini burada yapabilirsiniz
-                    // ...
-
-                    // Örneðin:
                     foreach (var jsonData in _serializableData._jsonValues)
                     {
                         MonoBehaviour script = FindScriptComponent(jsonData.componentName);
@@ -591,29 +490,20 @@ public class CombinedManagerWindow : EditorWindow
                             {
                                 object loadedValue = ConvertFromString(jsonData.originalType, jsonData.value);
                                 fieldInfo.SetValue(script, loadedValue);
-
-                                // Deðer deðiþikliðini tetikle
-
+                                Debug.Log($"Deðer yüklendi: {jsonData.componentName}.{jsonData.propertyName} = {loadedValue}");
                             }
                         }
                     }
-
-                    // Debug çýktýsý: Yüklenen JSON deðerleri
-                    foreach (var jsonData in _serializableData._jsonValues)
-                    {
-                        //Debug.Log($"Anahtar: {jsonData.key}, Bileþen: {jsonData.componentName}, Özellik: {jsonData.propertyName}, Orijinal Tür: {jsonData.originalType}, Deðer: {jsonData.value}");
-                    }
-
-                    //Debug.Log("JSON dosyasý þuradan yüklendi: " + jsonFilePath);
+                    Debug.Log("JSON verileri baþarýyla yüklendi.");
                 }
                 else
                 {
-                    Debug.LogError("JSON dosyasý yüklenemedi veya _jsonValues boþ.");
+                    Debug.LogWarning("Yüklenen veri geçersiz veya boþ.");
                 }
             }
             else
             {
-                Debug.Log("Belirtilen yerde JSON dosyasý bulunamadý: " + jsonFilePath);
+                Debug.LogWarning("JSON dosyasý bulunamadý.");
             }
         }
         catch (Exception e)
@@ -621,7 +511,6 @@ public class CombinedManagerWindow : EditorWindow
             Debug.LogError($"LoadJsonValues Hatasý: {e.Message}");
         }
     }
-
 
     private string GetOriginalTypeString(object value)
     {
@@ -631,7 +520,13 @@ public class CombinedManagerWindow : EditorWindow
         }
         else
         {
-            return value.GetType().FullName; // Orijinal türün tam adýný kullanabilirsiniz
+            Type type = value.GetType();
+            if (type == typeof(int)) return "System.Int32";
+            if (type == typeof(float)) return "System.Single";
+            if (type == typeof(bool)) return "System.Boolean";
+            if (type == typeof(string)) return "System.String";
+            // Diðer türler için gerekirse daha fazla durum ekleyebilirsiniz
+            return type.FullName;
         }
     }
 
@@ -639,7 +534,7 @@ public class CombinedManagerWindow : EditorWindow
     {
         if (value == null)
         {
-            return "null";
+            return "{}"; // Boþ deðerler için uygun bir temsil
         }
         else if (value is int || value is float || value is bool)
         {
@@ -653,118 +548,110 @@ public class CombinedManagerWindow : EditorWindow
         }
     }
 
-    // Deðerleri string'e dönüþtüren yardýmcý metod
     private object ConvertFromString(string originalType, string valueString)
     {
-        //Debug.Log($"String'den deðer dönüþtürülüyor: {valueString}");
-
-        object result = null;
+        if (string.IsNullOrEmpty(valueString) || valueString == "null")
+        {
+            return null;
+        }
 
         try
         {
-            if (originalType == typeof(int).FullName)
+            switch (originalType)
             {
-                int intValue;
-                if (int.TryParse(valueString, out intValue))
-                {
-                    result = intValue;
-                }
-            }
-            else if (originalType == typeof(float).FullName)
-            {
-                float floatValue;
-                // Virgülle ayrýlmýþ sayýlarý noktaya dönüþtür
-                if (float.TryParse(valueString.Replace('.', ','), out floatValue))
-                {
-                    result = floatValue;
-                }
-            }
-            else if (originalType == typeof(string).FullName)
-            {
-                result = valueString;
-            }
-            // Diðer türler için gerekirse daha fazla durum ekle
+                case "System.Int32":
+                    if (int.TryParse(valueString, out int intValue))
+                    {
+                        return intValue;
+                    }
+                    break;
 
-            // Bilinmeyen tür için varsayýlan olarak string döndür
-            if (result == null)
-            {
-                result = valueString;
+                case "System.Single":
+                    if (float.TryParse(valueString, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float floatValue))
+                    {
+                        return floatValue;
+                    }
+                    break;
+
+                case "System.Boolean":
+                    if (bool.TryParse(valueString, out bool boolValue))
+                    {
+                        return boolValue;
+                    }
+                    break;
+
+                case "System.String":
+                    return valueString;
+
+                default:
+                    Debug.LogError($"Bilinmeyen tür: {originalType}. Deðer: {valueString}");
+                    break;
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"ConvertFromString Hatasý: {e.Message}");
+            Debug.LogError($"ConvertFromString Hatasý: {e.Message}. Tür: {originalType}, Deðer: {valueString}");
         }
 
-        //Debug.Log($"Dönüþtürülen deðer: {result}");
-
-        return result;
+        // Hata durumunda varsayýlan olarak null döndür
+        return null;
     }
 
 
-    private bool CheckForChanges()
+    private void CheckForChanges()
     {
-        bool changesDetected = false;
-
-        foreach (var draggedObject in draggedGameObjectsList)
+        // Oyun çalýþýyor mu kontrolü
+        if (!Application.isPlaying)
         {
-            MonoBehaviour[] scripts = draggedObject.GetComponents<MonoBehaviour>();
-
-            foreach (var script in scripts)
-            {
-                // Önceki durumu kontrol etmek için bir sözlük oluþtur
-                if (!previousComponentValues.ContainsKey(script))
-                {
-                    previousComponentValues[script] = new Dictionary<string, object>();
-                }
-
-                // Farklýlýk kontrolü yap
-                changesDetected |= CheckForChanges(script);
-            }
+            Debug.LogWarning("Oyun çalýþmýyor. Deðiþiklikler kontrol edilemez.");
+            return; // Bu satýr doðru bir kullanýmdýr
         }
 
-        return changesDetected;
+        // Mevcut deðiþikliklerin kontrolü burada yapýlýr
+        foreach (var jsonData in _serializableData._jsonValues)
+        {
+            MonoBehaviour script = FindScriptComponent(jsonData.componentName);
+            if (script != null)
+            {
+                CheckForChanges(script);
+            }
+        }
     }
 
-    private bool CheckForChanges(MonoBehaviour script)
+    private void CheckForChanges(MonoBehaviour script)
     {
-        Dictionary<string, object> previousValues = previousComponentValues[script];
-        bool changesDetected = false;
-
-        System.Reflection.FieldInfo[] fields = script.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-
-        foreach (var fieldInfo in fields)
+        // Oyun çalýþýyor mu kontrolü
+        if (!Application.isPlaying)
         {
-            object currentValue = fieldInfo.GetValue(script);
-            string fieldName = fieldInfo.Name;
-
-            // Önceki deðer var mý kontrol et
-            if (previousValues.ContainsKey(fieldName))
-            {
-                object previousValue = previousValues[fieldName];
-
-                // Farklýlýk var mý kontrol et
-                if (!Equals(currentValue, previousValue))
-                {
-                    changesDetected = true;
-
-                    // Önceki deðeri güncelle
-                    previousValues[fieldName] = currentValue;
-                }
-            }
-            else
-            {
-                // Önceki deðeri güncelle
-                previousValues[fieldName] = currentValue;
-            }
+            Debug.LogWarning("Oyun çalýþmýyor. Deðiþiklikler kontrol edilemez.");
+            return; // Bu satýr doðru bir kullanýmdýr
         }
 
-        return changesDetected;
+        foreach (var jsonData in _serializableData._jsonValues)
+        {
+            if (jsonData.componentName == script.GetType().Name)
+            {
+                System.Reflection.FieldInfo fieldInfo = script.GetType().GetField(jsonData.propertyName);
+                if (fieldInfo != null)
+                {
+                    object currentValue = fieldInfo.GetValue(script);
+                    object previousValue = ConvertFromString(jsonData.originalType, jsonData.value);
+
+                    if (!currentValue.Equals(previousValue))
+                    {
+                        Debug.Log($"Deðiþiklik algýlandý: {jsonData.componentName}.{jsonData.propertyName} önceki deðer = {previousValue}, yeni deðer = {currentValue}");
+
+                        // Deðiþiklik algýlandýktan sonra gerekli iþlemleri yapýn
+                        jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+                    }
+                }
+            }
+        }
     }
 
     private MonoBehaviour FindScriptComponent(string componentName)
     {
-        foreach (var gameObject in draggedGameObjectsList)
+        foreach (var gameObject in FindObjectsOfType<GameObject>())
         {
             if (gameObject != null)
             {
@@ -774,15 +661,20 @@ public class CombinedManagerWindow : EditorWindow
                 {
                     if (script.GetType().Name == componentName)
                     {
-                        // Debug.Log($"Script component found for {componentName}: {script.GetType().Name}");
                         return script;
                     }
                 }
             }
         }
 
-        Debug.LogWarning($"Script component not found for {componentName}");
+        Debug.LogWarning($"Script component bulunamadý: {componentName}");
         return null;
+    }
+
+    [Serializable]
+    private class JsonWrapper
+    {
+        public object Value;
     }
 
     private void HandleValueChanged(string componentName, string propertyName, object newValue)
@@ -796,6 +688,29 @@ public class CombinedManagerWindow : EditorWindow
             {
                 fieldInfo.SetValue(script, newValue);
             }
+        }
+    }
+
+    private void LogSerializableData()
+    {
+        if (_serializableData != null && _serializableData._jsonValues != null)
+        {
+            Debug.Log("Logging _serializableData contents:");
+
+            foreach (var jsonData in _serializableData._jsonValues)
+            {
+                Debug.Log($"Key: {jsonData.key}");
+                Debug.Log($"Component Name: {jsonData.componentName}");
+                Debug.Log($"Property Name: {jsonData.propertyName}");
+                Debug.Log($"Original Type: {jsonData.originalType}");
+                Debug.Log($"Value: {jsonData.value}");
+                Debug.Log($"Toggle State: {jsonData.toggleState}");
+                Debug.Log("--------");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("_serializableData or _jsonValues is null.");
         }
     }
 }
