@@ -1374,9 +1374,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d36580e6789b8b44492458a8eadd737d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scoreValue: 30
-  _score: {fileID: 694741776}
-  scoreSlider: {fileID: 2134343460}
+  scoreValue: 695
+  _score: {fileID: 0}
+  scoreSlider: {fileID: 0}
 --- !u!4 &1524386795
 Transform:
   m_ObjectHideFlags: 0

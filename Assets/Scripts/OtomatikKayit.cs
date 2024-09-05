@@ -6,10 +6,11 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Collections;
+using Unity.VisualScripting;
 
 public class CombinedManagerWindow : EditorWindow
 {
-    private string jsonFilePath = "Assets/Resources/saveData/savedData.json";
+    //private string jsonFilePath = "Assets/Resources/saveData/savedData.json";
     private List<KeyValuePair<string, Dictionary<string, object>>> jsonValues = new List<KeyValuePair<string, Dictionary<string, object>>>();
     private List<MonoBehaviour> scriptComponents = new List<MonoBehaviour>();
     //public GameObject draggedGameObject;
@@ -43,7 +44,7 @@ public class CombinedManagerWindow : EditorWindow
             string key = GetFoldoutKey(scriptComponent);
             scriptFoldouts[scriptComponent.GetType().Name] = EditorPrefs.GetBool(key, true);
         }
-        EditorApplication.quitting += OnApplicationQuitting;
+        //EditorApplication.quitting += OnApplicationQuitting;
         Debug.Log("CombinedManagerWindow etkinleþtirildi");
     }
 
@@ -57,19 +58,18 @@ public class CombinedManagerWindow : EditorWindow
             string key = GetFoldoutKey(scriptComponent);
             EditorPrefs.SetBool(key, scriptFoldouts[scriptComponent.GetType().Name]);
         }
-        EditorApplication.quitting -= OnApplicationQuitting;
+
         Debug.Log("CombinedManagerWindow devre dýþý býrakýldý");
     }
+    //private void OnApplicationQuitting()
+    //{
+    //    // Oyun kapanýrken veya uygulama kapanýrken çaðrýlacak kod
 
-    private void OnApplicationQuitting()
-    {
-        // Oyun kapanýrken veya uygulama kapanýrken çaðrýlacak kod
 
+    //    SaveAllObjectsToJson();
+    //    Debug.Log("Çalýþtýýý");
 
-        SaveAllObjectsToJson();
-        Debug.Log("Çalýþtýýý");
-
-    }
+    //}
     private void Awake()
     {
         LoadJsonValues();
@@ -87,8 +87,10 @@ public class CombinedManagerWindow : EditorWindow
 
     private void Update()
     {
+        //EditorApplication.quitting -= OnApplicationQuitting;
+
         // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýrmak için kontrol
-        
+
 
         //if (changesDetected)
         //{
@@ -245,6 +247,11 @@ public class CombinedManagerWindow : EditorWindow
 
                             if (newVisibility)
                             {
+                                if(!Application.isPlaying)
+                                {
+                                    LoadJsonValues();
+                                }
+                                
                                 string toggleKey = $"{script.GetType().Name}_{fieldInfo.Name}";
                                 UpdateJsonValue(script.GetType().Name, fieldInfo.Name, fieldInfo.GetValue(script), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
                                 toggleValues[toggleKey] = newVisibility;
@@ -435,6 +442,8 @@ public class CombinedManagerWindow : EditorWindow
 
         // Deðiþiklikleri kaydet
         SaveAllObjectsToJson();
+        LoadJsonValues();
+
         //LogSerializableData();
         // Olayý tetikle
         OnValueChanged?.Invoke(componentName, propertyName, value);
@@ -448,19 +457,22 @@ public class CombinedManagerWindow : EditorWindow
 
     private void SaveAllObjectsToJson()
     {
-        try
-        {
-            // JSON verilerini güncellenmiþ haliyle kaydet
-            string json = JsonUtility.ToJson(_serializableData, true);
-            File.WriteAllText("Assets/Resources/saveData/savedData.json", json);
-            Debug.Log($"Tüm alanlar JSON olarak kaydedildi: Assets/Resources/saveData/savedData.json");
-            Debug.Log($"json:{json}");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
-        }
+        if (Application.isPlaying)
+            try
+            {
+                // JSON verilerini güncellenmiþ haliyle kaydet
+                string path = Application.persistentDataPath + "/saveData.json";
+                string json = JsonUtility.ToJson(_serializableData, true);
+                File.WriteAllText(path, json);
+                Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {path}");
+                Debug.Log($"json:{json}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
+            }
     }
+
 
 
 
@@ -469,7 +481,7 @@ public class CombinedManagerWindow : EditorWindow
     {
         try
         {
-            string path = Application.persistentDataPath + "/saveData.json";
+            string path = Application.persistentDataPath + "/saveData.json"; // Bu yolu kullanýn
             if (System.IO.File.Exists(path))
             {
                 string json = System.IO.File.ReadAllText(path);
@@ -511,6 +523,8 @@ public class CombinedManagerWindow : EditorWindow
             Debug.LogError($"LoadJsonValues Hatasý: {e.Message}");
         }
     }
+
+
 
     private string GetOriginalTypeString(object value)
     {
@@ -601,7 +615,7 @@ public class CombinedManagerWindow : EditorWindow
     private void CheckForChanges()
     {
         // Oyun çalýþýyor mu kontrolü
-        if (!Application.isPlaying)
+        if (Application.isPlaying)
         {
             Debug.LogWarning("Oyun çalýþmýyor. Deðiþiklikler kontrol edilemez.");
             return; // Bu satýr doðru bir kullanýmdýr
@@ -614,6 +628,7 @@ public class CombinedManagerWindow : EditorWindow
             if (script != null)
             {
                 CheckForChanges(script);
+
             }
         }
     }
@@ -642,7 +657,8 @@ public class CombinedManagerWindow : EditorWindow
                         Debug.Log($"Deðiþiklik algýlandý: {jsonData.componentName}.{jsonData.propertyName} önceki deðer = {previousValue}, yeni deðer = {currentValue}");
 
                         // Deðiþiklik algýlandýktan sonra gerekli iþlemleri yapýn
-                        jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+                         jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+                        Repaint();
                     }
                 }
             }
