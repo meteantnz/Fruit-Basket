@@ -16,20 +16,21 @@ public class CombinedManagerWindow : EditorWindow
     //public GameObject draggedGameObject;
     private Dictionary<string, bool> toggleValues = new Dictionary<string, bool>();
     private SerializableData _serializableData = new SerializableData();
-    private Dictionary<MonoBehaviour, Dictionary<string, object>> previousComponentValues = new Dictionary<MonoBehaviour, Dictionary<string, object>>();
+    //private Dictionary<MonoBehaviour, Dictionary<string, object>> previousComponentValues = new Dictionary<MonoBehaviour, Dictionary<string, object>>();
     public static event Action<string, string, object> OnValueChanged;
     private Dictionary<string, bool> scriptFoldouts = new Dictionary<string, bool>();
     private string currentGameObjectKey = "";
     private List<GameObject> draggedGameObjectsList = new List<GameObject>();
-    private bool foldout = true;
+    //private bool foldout = true;
     private List<ObjectData> objectDataList = new List<ObjectData>();
     private static bool isDirty = false;
+    private bool hasLoadedJsonData = false;
 
 
-    [MenuItem("Window/Özel Editör Penceresi")]
+    [MenuItem("Window/Otomatik Kayýt Sistemi")]
     public static void ShowWindow()
     {
-        GetWindow<CombinedManagerWindow>("Özel Editör Penceresi");
+        GetWindow<CombinedManagerWindow>("Otomatik Kayýt Sistemi");
     }
 
     private void OnEnable()
@@ -72,6 +73,7 @@ public class CombinedManagerWindow : EditorWindow
     //}
     private void Awake()
     {
+        SaveAllObjectsToJson();
         LoadJsonValues();
         Debug.Log("CombinedManagerWindow awake metodu çaðrýldý");
 
@@ -79,7 +81,6 @@ public class CombinedManagerWindow : EditorWindow
 
     private void OnDestroy()
     {
-        //SaveToJson();
         SaveAllObjectsToJson();
         OnValueChanged -= HandleValueChanged;
         Debug.Log("CombinedManagerWindow destroy metodu çaðrýldý");
@@ -87,22 +88,35 @@ public class CombinedManagerWindow : EditorWindow
 
     private void Update()
     {
-        //EditorApplication.quitting -= OnApplicationQuitting;
+        if (!Application.isPlaying)
+        {
+            if (!hasLoadedJsonData)
+            {
+                LoadJsonValues();
+                hasLoadedJsonData = true;
+                Debug.Log("Oyun durduruldu, JSON verileri yüklendi.");
+            }
+        }
+        else
+        {
+            if (hasLoadedJsonData)
+            {
+                hasLoadedJsonData = false;
+                Debug.Log("Oyun baþlatýldý, JSON verileri yeniden yüklendi.");
+                LoadJsonValues();
+            }
 
-        // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýrmak için kontrol
-
-
-        //if (changesDetected)
-        //{
-        //    // Deðer deðiþtiðinde Repaint fonksiyonunu çaðýr
-        //    Repaint();
-        //}
-        // Geri kalan Update fonksiyonu içeriði...
+            // Deðiþiklikleri kontrol et ve kaydet
+            
+        }
+        CheckForChanges();
     }
+
 
 
     private void OnGUI()
     {
+        
         Event currentEvent = Event.current;
 
         GUILayout.Label("Objeyi Buraya Sürükleyin", EditorStyles.boldLabel);
@@ -136,7 +150,7 @@ public class CombinedManagerWindow : EditorWindow
                 Event.current.Use();
                 break;
         }
-
+        
         // Listeye eklenen tüm GameObject'leri göster
         foreach (var gameObject in draggedGameObjectsList)
         {
@@ -158,7 +172,7 @@ public class CombinedManagerWindow : EditorWindow
         }
 
         GUILayout.Space(10f);
-
+        #region
         //foldout = EditorGUILayout.Foldout(foldout, "Sürüklenen Game Object'ler", true);
 
         //if (foldout)
@@ -187,7 +201,7 @@ public class CombinedManagerWindow : EditorWindow
 
         //    EditorGUI.indentLevel--;
         //}
-
+        #endregion
         // Her bir GameObject için scriptleri ve deðerleri göster
         foreach (var draggedGameObject in draggedGameObjectsList)
         {
@@ -247,10 +261,6 @@ public class CombinedManagerWindow : EditorWindow
 
                             if (newVisibility)
                             {
-                                if(!Application.isPlaying)
-                                {
-                                    LoadJsonValues();
-                                }
                                 
                                 string toggleKey = $"{script.GetType().Name}_{fieldInfo.Name}";
                                 UpdateJsonValue(script.GetType().Name, fieldInfo.Name, fieldInfo.GetValue(script), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
@@ -261,23 +271,24 @@ public class CombinedManagerWindow : EditorWindow
                 }
             }
         }
+        
     }
 
+    //OnSelectionChance týklanýlan objenin verilerini panele otomatik tanýmlar.
+    //private void OnSelectionChange()
+    //{
+    //    draggedGameObjectsList.Clear();
 
-    private void OnSelectionChange()
-    {
-        draggedGameObjectsList.Clear();
+    //    foreach (var selectedObject in Selection.objects)
+    //    {
+    //        if (selectedObject is GameObject)
+    //        {
+    //            draggedGameObjectsList.Add(selectedObject as GameObject);
+    //        }
+    //    }
 
-        foreach (var selectedObject in Selection.objects)
-        {
-            if (selectedObject is GameObject)
-            {
-                draggedGameObjectsList.Add(selectedObject as GameObject);
-            }
-        }
-
-        Repaint();
-    }
+    //    Repaint();
+    //}
 
     private string GetFoldoutKey(MonoBehaviour scriptComponent)
     {
@@ -413,7 +424,7 @@ public class CombinedManagerWindow : EditorWindow
     {
         public List<JsonData> _jsonValues = new List<JsonData>();
     }
-    private bool _hasChanges = false;
+    //private bool _hasChanges = false;
 
     public void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
@@ -437,15 +448,11 @@ public class CombinedManagerWindow : EditorWindow
                 originalType = GetOriginalTypeString(value),
                 value = ConvertToString(value),
                 toggleState = toggleState
+
             });
         }
+        //Debug.Log($"Updating JSON value for {componentName}.{propertyName}. New Value: {ConvertToString(value)}");
 
-        // Deðiþiklikleri kaydet
-        SaveAllObjectsToJson();
-        LoadJsonValues();
-
-        //LogSerializableData();
-        // Olayý tetikle
         OnValueChanged?.Invoke(componentName, propertyName, value);
     }
 
@@ -457,20 +464,19 @@ public class CombinedManagerWindow : EditorWindow
 
     private void SaveAllObjectsToJson()
     {
-        if (Application.isPlaying)
-            try
-            {
-                // JSON verilerini güncellenmiþ haliyle kaydet
-                string path = Application.persistentDataPath + "/saveData.json";
-                string json = JsonUtility.ToJson(_serializableData, true);
-                File.WriteAllText(path, json);
-                Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {path}");
-                Debug.Log($"json:{json}");
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
-            }
+        try
+        {
+            // JSON verilerini güncellenmiþ haliyle kaydet
+            string path = Application.persistentDataPath + "/saveData.json";
+            string json = JsonUtility.ToJson(_serializableData, true);
+            File.WriteAllText(path, json);
+            Debug.Log($"Tüm alanlar JSON olarak kaydedildi: {path}");
+            Debug.Log($"json:{json}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"SaveAllObjectsToJson Hatasý: {e.Message}");
+        }
     }
 
 
@@ -481,16 +487,20 @@ public class CombinedManagerWindow : EditorWindow
     {
         try
         {
-            string path = Application.persistentDataPath + "/saveData.json"; // Bu yolu kullanýn
-            if (System.IO.File.Exists(path))
+            string path = Application.persistentDataPath + "/saveData.json";
+            if (File.Exists(path))
             {
-                string json = System.IO.File.ReadAllText(path);
+                string json = File.ReadAllText(path);
                 _serializableData = JsonUtility.FromJson<SerializableData>(json);
 
-                // Verileri logla (opsiyonel)
-                LogSerializableData();
-
-                if (_serializableData != null && _serializableData._jsonValues != null)
+                // Yüklenen verilerin geçersiz veya boþ olup olmadýðýný kontrol edin
+                if (_serializableData == null || _serializableData._jsonValues == null)
+                {
+                    Debug.LogWarning("Yüklenen veri geçersiz veya boþ.");
+                    _serializableData = new SerializableData(); // Boþ bir veri oluþtur
+                    _serializableData._jsonValues = new List<JsonData>();
+                }
+                else
                 {
                     foreach (var jsonData in _serializableData._jsonValues)
                     {
@@ -508,19 +518,19 @@ public class CombinedManagerWindow : EditorWindow
                     }
                     Debug.Log("JSON verileri baþarýyla yüklendi.");
                 }
-                else
-                {
-                    Debug.LogWarning("Yüklenen veri geçersiz veya boþ.");
-                }
             }
             else
             {
                 Debug.LogWarning("JSON dosyasý bulunamadý.");
+                _serializableData = new SerializableData(); // Boþ bir veri oluþtur
+                _serializableData._jsonValues = new List<JsonData>();
             }
         }
         catch (Exception e)
         {
             Debug.LogError($"LoadJsonValues Hatasý: {e.Message}");
+            _serializableData = new SerializableData(); // Hata durumunda da boþ veri oluþtur
+            _serializableData._jsonValues = new List<JsonData>();
         }
     }
 
@@ -614,56 +624,59 @@ public class CombinedManagerWindow : EditorWindow
 
     private void CheckForChanges()
     {
-        // Oyun çalýþýyor mu kontrolü
-        if (Application.isPlaying)
+        if(!Application.isPlaying)
         {
-            Debug.LogWarning("Oyun çalýþmýyor. Deðiþiklikler kontrol edilemez.");
-            return; // Bu satýr doðru bir kullanýmdýr
+            Repaint();
         }
-
-        // Mevcut deðiþikliklerin kontrolü burada yapýlýr
         foreach (var jsonData in _serializableData._jsonValues)
         {
             MonoBehaviour script = FindScriptComponent(jsonData.componentName);
             if (script != null)
-            {
-                CheckForChanges(script);
-
-            }
-        }
-    }
-
-    private void CheckForChanges(MonoBehaviour script)
-    {
-        // Oyun çalýþýyor mu kontrolü
-        if (!Application.isPlaying)
-        {
-            Debug.LogWarning("Oyun çalýþmýyor. Deðiþiklikler kontrol edilemez.");
-            return; // Bu satýr doðru bir kullanýmdýr
-        }
-
-        foreach (var jsonData in _serializableData._jsonValues)
-        {
-            if (jsonData.componentName == script.GetType().Name)
             {
                 System.Reflection.FieldInfo fieldInfo = script.GetType().GetField(jsonData.propertyName);
                 if (fieldInfo != null)
                 {
                     object currentValue = fieldInfo.GetValue(script);
                     object previousValue = ConvertFromString(jsonData.originalType, jsonData.value);
-
                     if (!currentValue.Equals(previousValue))
                     {
+                        // Deðiþiklik olduðunu belirten bayrak
+                        isDirty = true;
                         Debug.Log($"Deðiþiklik algýlandý: {jsonData.componentName}.{jsonData.propertyName} önceki deðer = {previousValue}, yeni deðer = {currentValue}");
-
-                        // Deðiþiklik algýlandýktan sonra gerekli iþlemleri yapýn
-                         jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+                        //Debug.Log("Repaint edildidspþgjdsfpogjdsfopgdsfpogjdsfgdjfopgdpsofjdfopgj");
+                        Debug.Log(isDirty);
+                        jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+                        SaveAllObjectsToJson();
                         Repaint();
                     }
                 }
             }
         }
     }
+
+    //private void CheckForChanges(MonoBehaviour script)
+    //{
+    //    foreach (var jsonData in _serializableData._jsonValues)
+    //    {
+    //        if (jsonData.componentName == script.GetType().Name)
+    //        {
+    //            System.Reflection.FieldInfo fieldInfo = script.GetType().GetField(jsonData.propertyName);
+    //            if (fieldInfo != null)
+    //            {
+    //                object currentValue = fieldInfo.GetValue(script);
+    //                object previousValue = ConvertFromString(jsonData.originalType, jsonData.value);
+
+    //                if (!currentValue.Equals(previousValue))
+    //                {
+    //                    //Debug.Log($"Deðiþiklik algýlandý: {jsonData.componentName}.{jsonData.propertyName} önceki deðer = {previousValue}, yeni deðer = {currentValue}");
+
+    //                    // Deðiþiklik algýlandýktan sonra gerekli iþlemleri yapýn
+    //                    jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 
     private MonoBehaviour FindScriptComponent(string componentName)
     {
