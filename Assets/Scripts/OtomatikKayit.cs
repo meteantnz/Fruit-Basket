@@ -88,6 +88,7 @@ public class CombinedManagerWindow : EditorWindow
 
     private void Update()
     {
+        CheckForChanges();
         if (!Application.isPlaying)
         {
             if (!hasLoadedJsonData)
@@ -107,16 +108,16 @@ public class CombinedManagerWindow : EditorWindow
             }
 
             // Deðiþiklikleri kontrol et ve kaydet
-            
+
         }
-        CheckForChanges();
+        
     }
 
 
 
     private void OnGUI()
     {
-        
+
         Event currentEvent = Event.current;
 
         GUILayout.Label("Objeyi Buraya Sürükleyin", EditorStyles.boldLabel);
@@ -150,7 +151,7 @@ public class CombinedManagerWindow : EditorWindow
                 Event.current.Use();
                 break;
         }
-        
+
         // Listeye eklenen tüm GameObject'leri göster
         foreach (var gameObject in draggedGameObjectsList)
         {
@@ -261,7 +262,7 @@ public class CombinedManagerWindow : EditorWindow
 
                             if (newVisibility)
                             {
-                                
+
                                 string toggleKey = $"{script.GetType().Name}_{fieldInfo.Name}";
                                 UpdateJsonValue(script.GetType().Name, fieldInfo.Name, fieldInfo.GetValue(script), toggleValues.ContainsKey(toggleKey) && toggleValues[toggleKey]);
                                 toggleValues[toggleKey] = newVisibility;
@@ -271,7 +272,7 @@ public class CombinedManagerWindow : EditorWindow
                 }
             }
         }
-        
+
     }
 
     //OnSelectionChance týklanýlan objenin verilerini panele otomatik tanýmlar.
@@ -408,7 +409,6 @@ public class CombinedManagerWindow : EditorWindow
         public string propertyName;
         public string originalType; // Yeni eklenen alan: orijinal veri tipini saklar
         public string value;
-        public bool toggleState;
     }
 
 
@@ -424,37 +424,53 @@ public class CombinedManagerWindow : EditorWindow
     {
         public List<JsonData> _jsonValues = new List<JsonData>();
     }
-    //private bool _hasChanges = false;
 
     public void UpdateJsonValue(string componentName, string propertyName, object value, bool toggleState)
     {
-        // Mevcut JSON verilerini güncelle
-        var jsonData = _serializableData._jsonValues
-            .FirstOrDefault(jd => jd.componentName == componentName && jd.propertyName == propertyName);
-
-        if (jsonData != null)
+        if (toggleState)
         {
-            jsonData.value = ConvertToString(value);
-            jsonData.originalType = GetOriginalTypeString(value);
-            jsonData.toggleState = toggleState;
+            // Toggle true ise, JSON verilerini güncelle
+            var jsonData = _serializableData._jsonValues
+                .FirstOrDefault(jd => jd.componentName == componentName && jd.propertyName == propertyName);
+
+            if (jsonData != null)
+            {
+                jsonData.value = ConvertToString(value);
+                jsonData.originalType = GetOriginalTypeString(value);
+            }
+            else
+            {
+                _serializableData._jsonValues.Add(new JsonData
+                {
+                    key = $"{componentName}_{propertyName}",
+                    componentName = componentName,
+                    propertyName = propertyName,
+                    originalType = GetOriginalTypeString(value),
+                    value = ConvertToString(value),
+                });
+            }
+
+            // JSON verilerini kaydet
+
+            OnValueChanged?.Invoke(componentName, propertyName, value);
         }
         else
         {
-            _serializableData._jsonValues.Add(new JsonData
+            // Toggle false ise, JSON verilerini kaldýr
+            var jsonData = _serializableData._jsonValues
+                .FirstOrDefault(jd => jd.componentName == componentName && jd.propertyName == propertyName);
+
+            if (jsonData != null)
             {
-                key = $"{componentName}_{propertyName}",
-                componentName = componentName,
-                propertyName = propertyName,
-                originalType = GetOriginalTypeString(value),
-                value = ConvertToString(value),
-                toggleState = toggleState
+                _serializableData._jsonValues.Remove(jsonData);
 
-            });
+                // JSON verilerini kaydet
+            }
+
+            // Toggle false olduðunda deðiþiklik olayý tetiklenmez
         }
-        //Debug.Log($"Updating JSON value for {componentName}.{propertyName}. New Value: {ConvertToString(value)}");
-
-        OnValueChanged?.Invoke(componentName, propertyName, value);
     }
+
 
     private bool GetToggleState(string componentName, string propertyName)
     {
@@ -624,11 +640,17 @@ public class CombinedManagerWindow : EditorWindow
 
     private void CheckForChanges()
     {
-        if(!Application.isPlaying)
+        if (!Application.isPlaying)
         {
             Repaint();
         }
-        foreach (var jsonData in _serializableData._jsonValues)
+
+        List<JsonData> toRemove = new List<JsonData>(); // Silinecek elemanlarý saklamak için
+
+        // Koleksiyonun kopyasýný alarak döngüye baþla
+        var jsonDataList = _serializableData._jsonValues.ToList();
+
+        foreach (var jsonData in jsonDataList)
         {
             MonoBehaviour script = FindScriptComponent(jsonData.componentName);
             if (script != null)
@@ -638,21 +660,46 @@ public class CombinedManagerWindow : EditorWindow
                 {
                     object currentValue = fieldInfo.GetValue(script);
                     object previousValue = ConvertFromString(jsonData.originalType, jsonData.value);
-                    if (!currentValue.Equals(previousValue))
+
+                    bool toggleState = GetToggleState(jsonData.componentName, jsonData.propertyName);
+
+
+                    Debug.Log(toggleState);
+                    if (toggleState)
                     {
-                        // Deðiþiklik olduðunu belirten bayrak
-                        isDirty = true;
-                        Debug.Log($"Deðiþiklik algýlandý: {jsonData.componentName}.{jsonData.propertyName} önceki deðer = {previousValue}, yeni deðer = {currentValue}");
-                        //Debug.Log("Repaint edildidspþgjdsfpogjdsfopgdsfpogjdsfgdjfopgdpsofjdfopgj");
-                        Debug.Log(isDirty);
-                        jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
-                        SaveAllObjectsToJson();
-                        Repaint();
+                        if (!currentValue.Equals(previousValue))
+                        {
+                            // Deðiþiklik olduðunu belirten bayrak
+                            isDirty = true;
+                            Debug.Log($"Deðiþiklik algýlandý: {jsonData.componentName}.{jsonData.propertyName} önceki deðer = {previousValue}, yeni deðer = {currentValue}");
+                            jsonData.value = ConvertToString(currentValue); // Yeni deðeri JSON'da güncelle
+                            SaveAllObjectsToJson();
+                            Repaint();
+                        }
+                    }
+                    else
+                    {
+                        if (currentValue.Equals(previousValue))
+                        {
+                            toRemove.Add(jsonData); // Silinecek elemanlarý iþaretle
+                        }
                     }
                 }
             }
         }
+
+        // Koleksiyon güncellemeleri döngüden sonra yapýlýr
+        foreach (var item in toRemove)
+        {
+            _serializableData._jsonValues.Remove(item);
+        }
+
+        // JSON dosyasýný güncellenmiþ koleksiyonla kaydet
+
+        //Repaint();
     }
+
+
 
     //private void CheckForChanges(MonoBehaviour script)
     //{
@@ -733,7 +780,6 @@ public class CombinedManagerWindow : EditorWindow
                 Debug.Log($"Property Name: {jsonData.propertyName}");
                 Debug.Log($"Original Type: {jsonData.originalType}");
                 Debug.Log($"Value: {jsonData.value}");
-                Debug.Log($"Toggle State: {jsonData.toggleState}");
                 Debug.Log("--------");
             }
         }
